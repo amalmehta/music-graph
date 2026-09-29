@@ -217,4 +217,4 @@ python3 server.py --music-dir data/test_audio
 
 ---
 
-Back to the [README](README.md), or read the project brief in [spotify_graph.md](spotify_graph.md) for the decisions behind all of this and what has been verified.
+Back to the [README](README.md) for the tour, or read the project brief in [spotify_graph.md](spotify_graph.md) for the decisions behind all of this and what has been verified.
