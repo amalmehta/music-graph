@@ -1,0 +1,11 @@
+.venv/
+data/raw/
+data/sample/
+config.json
+__pycache__/
+data/test_audio/
+data/sample_big/
+
+# generated from your export — contains your real listening history
+data/graph_data.json
+data/history_index.json

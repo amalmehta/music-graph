@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Music Graph</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎧</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = JSON.parse(t); } catch {}
+  </script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <h1>Music Graph</h1>
+      <span class="badge" id="sample-badge" hidden title="Built from generated sample data. Run build_data.py on your export to see your own.">sample data</span>
+    </div>
+    <dl class="stats" id="stats"></dl>
+    <div class="top-actions">
+      <button class="np-pill" id="np-open" hidden><span class="np-pill-dot"></span><span id="np-pill-text">Now playing</span></button>
+      <button class="icon-btn" id="theme-toggle" aria-label="Toggle light or dark theme" title="Theme">◐</button>
+    </div>
+  </header>
+
+  <section class="timeline" aria-label="Date range">
+    <svg id="brush" role="img" aria-label="Monthly listening; drag to pick a date range"></svg>
+    <div class="range-row">
+      <span id="range-label"></span>
+      <button class="link-btn" id="range-reset" hidden>Show all time</button>
+    </div>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-view="vibes" aria-selected="true">Vibes</button>
+    <button role="tab" data-view="network" aria-selected="false">Network</button>
+    <button role="tab" data-view="time" aria-selected="false">Over time</button>
+    <button role="tab" data-view="habits" aria-selected="false">Habits</button>
+    <button role="tab" data-view="poster" aria-selected="false">Poster</button>
+    <button role="tab" data-view="foryou" aria-selected="false">For you</button>
+    <button role="tab" data-view="dj" aria-selected="false">DJ</button>
+  </nav>
+
+  <main>
+    <section class="view" id="view-vibes">
+      <div class="viz-card">
+        <svg id="vibes-svg"></svg>
+        <p class="hint">Artists you play in the same sessions sit together. Each glow is a vibe, and the arcs are what ties them together. Scroll to zoom, click to explore.</p>
+      </div>
+      <aside class="side-panel" id="vibe-panel"></aside>
+    </section>
+
+    <section class="view" id="view-network" hidden>
+      <div class="viz-card">
+        <div class="viz-toolbar">
+          <input id="artist-search" type="search" placeholder="Find an artist…" list="artist-list" autocomplete="off">
+          <datalist id="artist-list"></datalist>
+          <button class="ghost-btn" id="bridges-only" aria-pressed="false" title="Show only the links that cross between vibes">Bridges only</button>
+        </div>
+        <svg id="network-svg"></svg>
+        <p class="hint">Lines connect artists you play together; the brighter, blended ones bridge two vibes. Hover to trace an artist's circle.</p>
+      </div>
+    </section>
+
+    <section class="view" id="view-time" hidden>
+      <div class="viz-card">
+        <div class="viz-toolbar">
+          <div class="segmented" id="stream-mode">
+            <button data-mode="artists" aria-pressed="true">Top artists</button>
+            <button data-mode="vibes" aria-pressed="false">Vibes</button>
+          </div>
+        </div>
+        <svg id="stream-svg"></svg>
+        <p class="hint">Monthly listening time for your top 12 artists or your vibes. Drag across the bar at the top to zoom into a period.</p>
+      </div>
+    </section>
+
+    <section class="view" id="view-habits" hidden>
+      <div class="viz-card pad">
+        <div class="section-head"><h2>When you listen</h2><p>Every hour of the week, colored by how much you played.</p></div>
+        <svg id="habits-grid" role="img" aria-label="Listening by hour and weekday"></svg>
+        <svg id="habits-legend" class="habits-legend" aria-hidden="true"></svg>
+        <dl class="habit-stats" id="habits-summary"></dl>
+        <div class="section-head"><h2>Every day</h2><p>One square per day, brighter when you listened more.</p></div>
+        <div class="cal-wrap"><svg id="habits-calendar" role="img" aria-label="Calendar of daily listening"></svg></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-poster" hidden>
+      <div class="poster-layout">
+        <aside class="side-panel poster-side">
+          <h2>Poster</h2>
+          <p class="sub">A print of your listening. It follows the date range at the top.</p>
+          <label class="field"><span>Title</span><input type="text" id="poster-title" maxlength="28" autocomplete="off"></label>
+          <div id="poster-controls">
+            <div class="field"><span>Style</span>
+              <div class="segmented">
+                <button data-opt="style" data-value="aurora" aria-pressed="true">Aurora</button>
+                <button data-opt="style" data-value="rings" aria-pressed="false">Year rings</button>
+                <button data-opt="style" data-value="constellation" aria-pressed="false">Constellation</button>
+              </div>
+            </div>
+            <div class="field"><span>Colors</span>
+              <div class="segmented">
+                <button data-opt="palette" data-value="vibes" aria-pressed="true">Vibes</button>
+                <button data-opt="palette" data-value="duotone" aria-pressed="false">Duotone</button>
+                <button data-opt="palette" data-value="mono" aria-pressed="false">Mono</button>
+              </div>
+            </div>
+            <div class="field"><span>Paper</span>
+              <div class="segmented">
+                <button data-opt="dark" data-value="true" aria-pressed="true">Dark</button>
+                <button data-opt="dark" data-value="false" aria-pressed="false">Light</button>
+              </div>
+            </div>
+            <div class="field"><span>Labels</span>
+              <div class="segmented">
+                <button data-opt="labels" data-value="true" aria-pressed="true">On</button>
+                <button data-opt="labels" data-value="false" aria-pressed="false">Off</button>
+              </div>
+            </div>
+          </div>
+          <div class="panel-actions">
+            <button class="primary-btn" id="poster-png">Download PNG</button>
+            <button class="ghost-btn" id="poster-svg">SVG</button>
+          </div>
+          <p class="note">PNG exports at 3000 × 4242, big enough to print at A3.</p>
+        </aside>
+        <div class="poster-stage"><svg id="poster-svg-el" aria-label="Poster preview"></svg></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-foryou" hidden>
+      <div class="foryou">
+        <div class="foryou-head">
+          <h2>Pick a vibe</h2>
+          <p>Playlists built from your own history: songs you love that fit the mood.</p>
+        </div>
+        <div class="vibe-cards" id="vibe-cards"></div>
+        <div class="recs" id="recs" hidden>
+          <div class="recs-controls">
+            <label class="slider">
+              <span>Rediscover</span>
+              <input type="range" id="recs-mix" min="0" max="1" step="0.05" value="0.35" aria-label="Rediscover forgotten songs versus current favorites">
+              <span>Comfort</span>
+            </label>
+            <div class="segmented" id="recs-length">
+              <button data-n="15" aria-pressed="false">15</button>
+              <button data-n="25" aria-pressed="true">25</button>
+              <button data-n="40" aria-pressed="false">40</button>
+            </div>
+            <button class="ghost-btn" id="recs-shuffle">↻ Shuffle again</button>
+          </div>
+          <div class="recs-header">
+            <div>
+              <h3 id="recs-title"></h3>
+              <p id="recs-sub"></p>
+            </div>
+            <div class="recs-actions">
+              <button class="primary-btn" id="recs-play">▶ Play all</button>
+              <button class="ghost-btn" id="recs-save">Save to Spotify</button>
+            </div>
+          </div>
+          <p class="note" id="recs-note" hidden></p>
+          <ol class="rec-list" id="rec-list"></ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-dj" hidden>
+      <div class="dj">
+        <div class="dj-decks">
+          <div id="dj-decks-a"></div>
+          <div class="dj-center">
+            <canvas id="dj-wave" aria-label="Scrolling waveforms for both decks"></canvas>
+            <div class="dj-xfader">
+              <span class="xf-label a">A</span>
+              <input type="range" id="dj-xfade" min="0" max="1" step="0.001" value="0.5" aria-label="Crossfader" title="Crossfader (← →, double-click to center)">
+              <span class="xf-label b">B</span>
+            </div>
+            <div class="dj-master">
+              <label class="slider"><span>Master</span><input type="range" id="dj-master" min="0" max="1" step="0.01" value="0.9" aria-label="Master volume"></label>
+              <button class="ghost-btn rec-btn" id="dj-rec">● Record</button>
+              <span class="rec-time" id="dj-rec-time"></span>
+              <button class="primary-btn" id="dj-full">✦ Light show</button>
+            </div>
+            <p class="dj-help">Keys: <kbd>A</kbd>/<kbd>L</kbd> play · <kbd>S</kbd>/<kbd>K</kbd> sync · <kbd>←</kbd><kbd>→</kbd> crossfade. Mix audio files you own. Spotify's audio is protected, so it can't be mixed here.</p>
+          </div>
+          <div id="dj-decks-b"></div>
+        </div>
+
+        <section class="crate">
+          <div class="crate-head">
+            <h3>Crate</h3>
+            <div class="segmented" id="crate-tabs">
+              <button data-src="folder" aria-pressed="true">Music folder</button>
+              <button data-src="dropped" aria-pressed="false">Dropped files <span id="dropped-count"></span></button>
+            </div>
+            <input type="search" id="crate-search" placeholder="Search title or artist…" autocomplete="off">
+            <button class="ghost-btn" id="crate-refresh">Rescan</button>
+            <label class="ghost-btn file-btn">Add files<input type="file" id="crate-files" accept="audio/*,.mp3,.m4a,.wav,.aiff,.aif,.flac,.ogg" multiple hidden></label>
+          </div>
+          <p class="crate-dir" id="crate-dir"></p>
+          <div class="crate-table-wrap">
+            <table class="crate-table">
+              <thead><tr><th>Title</th><th>Artist</th><th class="num">Time</th><th class="num">BPM</th><th>Key</th><th>Spotify plays</th><th>Load</th></tr></thead>
+              <tbody id="crate-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div class="tooltip" id="tooltip" hidden></div>
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <div class="np" id="np" hidden tabindex="-1" aria-label="Now playing">
+    <canvas class="np-gl" id="np-gl"></canvas>
+    <canvas class="np-fx" id="np-fx"></canvas>
+    <div class="np-ui">
+      <div class="np-bar">
+        <div class="np-audio">
+          <button class="np-btn" id="np-audio-btn">Sync to sound</button>
+          <select class="np-select" id="np-device" hidden aria-label="Audio input"></select>
+          <span class="np-audio-state" id="np-audio-state">Reacting to the album colors</span>
+        </div>
+        <button class="np-btn np-close" id="np-close" aria-label="Close now playing">✕</button>
+      </div>
+      <div class="np-stage">
+        <div class="np-art-wrap" id="np-art-wrap"><img id="np-art" alt=""><div class="np-disc" aria-hidden="true"><span>A ⇄ B</span></div></div>
+        <div class="np-meta">
+          <div class="np-title" id="np-title"></div>
+          <div class="np-artist" id="np-artist"></div>
+          <div class="np-progress"><span id="np-progress-fill"></span></div>
+        </div>
+      </div>
+      <div class="np-panels">
+        <div class="np-card">
+          <div class="np-card-head"><span class="np-eyebrow">In your taste map</span><span id="np-map-label"></span></div>
+          <canvas id="np-map"></canvas>
+        </div>
+        <div class="np-card">
+          <div class="np-card-head"><span class="np-eyebrow">You &amp; this song</span><span id="np-history-label"></span></div>
+          <canvas id="np-history"></canvas>
+          <div class="np-history-stats" id="np-history-stats"></div>
+        </div>
+      </div>
+      <div class="np-dj" id="np-dj" hidden>
+        <canvas id="dj-wave-full"></canvas>
+        <div class="np-dj-controls">
+          <button class="np-btn" data-djact="play" data-deck="A">▶ A</button>
+          <button class="np-btn" data-djact="sync" data-deck="A">Sync A</button>
+          <input type="range" id="dj-xfade-full" min="0" max="1" step="0.001" value="0.5" aria-label="Crossfader">
+          <button class="np-btn" data-djact="sync" data-deck="B">Sync B</button>
+          <button class="np-btn" data-djact="play" data-deck="B">▶ B</button>
+        </div>
+      </div>
+      <button class="np-btn np-more" id="np-more" hidden>More like this vibe →</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
