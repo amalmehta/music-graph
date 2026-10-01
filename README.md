@@ -70,7 +70,7 @@ Pick a vibe and get a playlist built from your own history: songs you love that 
 
 When a song plays, the page becomes a full-screen light show in the album's colors. It reacts to the actual sound through your mic (or BlackHole), and shows where the song sits in your taste map and your history with it.
 
-![Now Playing](screenshots/hero.png)
+![Now Playing](screenshots/now-playing.png)
 
 ## DJ
 
