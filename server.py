@@ -185,6 +185,15 @@ def first_quoted(value):
     return value.strip("() \n\t") if value.startswith("(") else value
 
 
+def display_path(p):
+    """Shorten a path for the UI so screenshots and screen shares don't leak a home directory."""
+    home = Path.home()
+    try:
+        return "~/" + str(Path(p).relative_to(home))
+    except ValueError:
+        return str(p)
+
+
 class Crate:
     """Audio files under the music folder. Files are only ever addressed by id, never by path."""
 
@@ -195,7 +204,7 @@ class Crate:
         with self.lock:
             if self.tracks is None or refresh:
                 self._scan()
-            return {"dir": str(self.root), "exists": self.root.is_dir(), "tracks": self.tracks, "truncated": len(self.tracks) >= MAX_CRATE}
+            return {"dir": display_path(self.root), "exists": self.root.is_dir(), "tracks": self.tracks, "truncated": len(self.tracks) >= MAX_CRATE}
 
     def _scan(self):
         files = []
