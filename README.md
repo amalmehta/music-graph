@@ -89,3 +89,7 @@ Everything runs locally. Your export never leaves the machine: `data/raw/` and t
 ## Requirements
 
 macOS (the Now Playing and crate features use AppleScript and Spotlight), Python 3.12 for the pipeline, Python 3 for the server, and a Chromium-based browser or Safari. No build step, no framework.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
