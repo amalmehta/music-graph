@@ -10,7 +10,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <script>
-    try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = JSON.parse(t); } catch {}
+    try {
+      const wanted = new URLSearchParams(location.search).get("theme");   // ?theme=dark / ?theme=light
+      const saved = localStorage.getItem("theme");
+      const theme = wanted === "dark" || wanted === "light" ? wanted : saved ? JSON.parse(saved) : null;
+      if (theme) document.documentElement.dataset.theme = theme;
+    } catch {}
   </script>
 </head>
 <body>

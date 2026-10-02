@@ -80,6 +80,12 @@ Two decks for audio files you own — Spotify's audio is protected, so it can't 
 
 The light show at the top of this page is a live mix: both decks' colors in the aurora, both waveforms and the crossfader on screen.
 
+## Light and dark
+
+The whole app follows your system theme, and the toggle in the header overrides it. `?theme=dark` or `?theme=light` opens it either way.
+
+![The vibes map in dark mode](screenshots/15-vibes-dark.png)
+
 ## Privacy
 
 Everything runs locally. Your export never leaves the machine: `data/raw/` and the generated `data/*.json` are gitignored, the server only listens on `127.0.0.1` and refuses requests from other sites, and Spotify login tokens stay in your browser.
