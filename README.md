@@ -52,7 +52,9 @@ When you listen, hour by hour across the week, with your peak outlined. Below it
 
 ## Poster
 
-A print of your listening, exported as PNG (3000 × 4242) or SVG.
+Give it a title, pick a style, colors, paper and whether to label it, then export at PNG (3000 × 4242) or SVG — big enough to print at A3.
+
+![Poster](screenshots/16-poster-tab.png)
 
 | Aurora | Year rings | Constellation |
 | --- | --- | --- |
