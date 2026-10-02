@@ -141,6 +141,7 @@ python3 server.py --music-dir data/test_audio
 | --- | --- |
 | `#network`, `#time`, `#habits`, `#poster`, `#foryou`, `#dj` | that tab |
 | `?np=off` | without Now Playing taking over (the header button still opens it) |
+| `?np=hide` | with the Now Playing pill hidden entirely, for clean screenshots |
 | `?theme=dark` / `?theme=light` | in a specific theme, whatever your system is set to |
 | `?bridges=1#network` | the network with only the links that cross between vibes |
 | `?poster=aurora&paper=light#poster` | a poster style and paper directly |

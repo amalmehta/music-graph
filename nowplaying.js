@@ -131,7 +131,7 @@ function update(s) {
   }
   status = s;
   statusAt = performance.now();
-  els.pill.hidden = false;
+  els.pill.hidden = hidePill;
   els.pillText.textContent = `${s.track} · ${s.artist}`;
   if (external) return;
   const playing = s.state === "playing";
@@ -192,7 +192,9 @@ function onTrackChange(s) {
 
 // ---------- open / close ----------
 
-const autoOpen = new URLSearchParams(location.search).get("np") !== "off";
+const npMode = new URLSearchParams(location.search).get("np");
+const hidePill = npMode === "hide";
+const autoOpen = npMode !== "off" && !hidePill;
 
 function open(manual = false) {
   if (!manual && (!status || !autoOpen || autoOpenBlocker())) return;
