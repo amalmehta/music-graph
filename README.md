@@ -2,7 +2,7 @@
 
 Your Spotify listening history, turned into something you can explore, print and play with. Runs entirely on your own machine.
 
-![The light show: album colors, a frequency ring, and where the song sits in your history](screenshots/hero.png)
+![The light show running off a live DJ mix: both decks' colors in the aurora, the frequency ring reacting to the audio](screenshots/14-dj-lightshow.png)
 
 ## Run it
 
@@ -78,9 +78,7 @@ Two decks for audio files you own — Spotify's audio is protected, so it can't 
 
 ![DJ decks](screenshots/13-dj-synced.png)
 
-The light show can run off your mix instead of Spotify, with both waveforms and the crossfader on screen.
-
-![DJ light show](screenshots/14-dj-lightshow.png)
+The light show at the top of this page is a live mix: both decks' colors in the aurora, both waveforms and the crossfader on screen.
 
 ## Privacy
 
