@@ -23,11 +23,12 @@
     <div class="brand">
       <span class="brand-mark" aria-hidden="true"></span>
       <h1>Music Graph</h1>
-      <span class="badge" id="sample-badge" hidden title="Built from generated sample data. Run build_data.py on your export to see your own.">sample data</span>
+      <button class="badge" id="sample-badge" hidden title="Made-up listening. Click to import your own export.">sample data</button>
     </div>
     <dl class="stats" id="stats"></dl>
     <div class="top-actions">
       <button class="np-pill" id="np-open" hidden><span class="np-pill-dot"></span><span id="np-pill-text">Now playing</span></button>
+      <button class="icon-btn" id="setup-open" aria-label="Your data and setup" title="Your data and setup">⚙</button>
       <button class="icon-btn" id="theme-toggle" aria-label="Toggle light or dark theme" title="Theme">◐</button>
     </div>
   </header>
@@ -271,5 +272,37 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
   <script type="module" src="app.js"></script>
+  <dialog class="setup" id="setup" aria-label="Your data and setup">
+    <div class="setup-card">
+      <header class="setup-head">
+        <h2>Your data</h2>
+        <button class="icon-btn" id="setup-close" aria-label="Close">×</button>
+      </header>
+
+      <div id="data-summary"></div>
+
+      <div class="setup-drop" id="import-drop">
+        <p><strong>Drop the zip Spotify sent you</strong></p>
+        <p class="setup-sub">Request it at <a href="https://www.spotify.com/account/privacy/" target="_blank" rel="noopener">spotify.com/account/privacy</a> — ask for <em>Extended streaming history</em>, not the basic one. It can take up to 30 days to arrive.</p>
+        <button class="ghost-btn" id="import-pick">Choose a file…</button>
+        <input type="file" id="import-file" accept=".zip,.json" hidden>
+      </div>
+
+      <div class="setup-progress" id="import-progress" hidden>
+        <p id="import-state"></p>
+        <pre id="import-log" aria-live="polite"></pre>
+        <button class="primary-btn" id="import-reload" hidden>Show my music</button>
+        <button class="ghost-btn" id="import-again" hidden>Try another file</button>
+      </div>
+
+      <h2>Play and save through Spotify</h2>
+      <p class="setup-sub">Optional. Needed only to play a playlist on this Mac or save one to your account. Make an app at <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a>, add <code id="setup-redirect"></code> as a redirect URI, then paste the Client ID here.</p>
+      <div class="setup-row">
+        <input type="text" id="spotify-client-id" placeholder="Client ID" autocomplete="off" spellcheck="false">
+        <button class="ghost-btn" id="spotify-save">Save</button>
+      </div>
+    </div>
+  </dialog>
+
 </body>
 </html>

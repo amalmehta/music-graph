@@ -14,6 +14,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import threading
 import time
 import urllib.request
@@ -33,6 +34,8 @@ AUDIO_TYPES = {
     ".aiff": "audio/aiff", ".flac": "audio/flac", ".ogg": "audio/ogg", ".opus": "audio/ogg",
 }
 MAX_CRATE = 10_000
+MAX_UPLOAD = 1_000_000_000          # a very large extended history is a few hundred MB
+SAFE_UPLOAD = re.compile(r"^[A-Za-z0-9 ._-]{1,120}\.(zip|json)$")
 STATIC_FILES = re.compile(r"^/([a-z]+\.(js|css|html)|data/(graph_data|history_index)\.json|config\.json)$")
 
 NOW_PLAYING_SCRIPT = f'''
@@ -237,7 +240,85 @@ class Crate:
             return self.paths.get(tid)
 
 
+class Importer:
+    """Runs build_data.py on an uploaded export, so nobody has to open a terminal."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.state = "idle"       # idle | building | done | error
+        self.lines = []
+        self.source = ""
+        self.started = 0.0
+
+    def status(self):
+        with self.lock:
+            return {"state": self.state, "lines": list(self.lines), "source": self.source,
+                    "seconds": round(time.time() - self.started, 1) if self.started else 0}
+
+    def busy(self):
+        with self.lock:
+            return self.state == "building"
+
+    def start(self, path):
+        with self.lock:
+            if self.state == "building":
+                return False
+            self.state, self.lines, self.source, self.started = "building", [], path.name, time.time()
+        threading.Thread(target=self._run, args=(path,), daemon=True).start()
+        return True
+
+    def _say(self, line):
+        with self.lock:
+            self.lines.append(line)
+            del self.lines[:-200]
+
+    def _run(self, path):
+        self._say(f"Reading {path.name}…")
+        try:
+            proc = subprocess.Popen(
+                [python_for_build(), str(ROOT / "build_data.py"), "--src", str(path)],
+                cwd=str(ROOT), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            for line in proc.stdout:
+                self._say(line.rstrip())
+            code = proc.wait()
+        except Exception as e:
+            self._say(str(e))
+            code = 1
+        with self.lock:
+            self.state = "done" if code == 0 else "error"
+
+
+def python_for_build():
+    """Prefer the project venv: build_data.py needs networkx, which the server does not."""
+    venv = ROOT / ".venv" / "bin" / "python"
+    return str(venv) if venv.exists() else sys.executable
+
+
+importer = Importer()
+
+
 crate = None
+
+
+def write_config(body):
+    """Save the few settings the page can change, so nobody has to hand-edit config.json."""
+    path = ROOT / "config.json"
+    try:
+        config = json.loads(path.read_text())
+        if not isinstance(config, dict):
+            config = {}
+    except (OSError, ValueError):
+        config = {}
+    if "client_id" in body:
+        cid = str(body["client_id"]).strip()
+        if cid and not re.fullmatch(r"[0-9a-f]{32}", cid):
+            return {"ok": False, "error": "A Spotify Client ID is 32 characters, digits and a\u2013f."}
+        if cid:
+            config["client_id"] = cid
+        else:
+            config.pop("client_id", None)
+    path.write_text(json.dumps(config, indent=2) + "\n")
+    return {"ok": True, "client_id": bool(config.get("client_id"))}
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -274,6 +355,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(now_playing.get())
         if url.path == "/api/queue":
             return self._json(player.status())
+        if url.path == "/api/import":
+            return self._json(importer.status())
         if url.path == "/api/crate":
             return self._json(crate.list(refresh=parse_qs(url.query).get("refresh") == ["1"]))
         if url.path == "/api/crate/file":
@@ -289,7 +372,14 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
-        if not self._host_ok() or self.headers.get("Content-Type", "").split(";")[0] != "application/json":
+        upload = urlparse(self.path).path == "/api/import"
+        if not self._host_ok():
+            if upload:
+                self._drain(int(self.headers.get("Content-Length") or 0))
+            return self.send_error(HTTPStatus.FORBIDDEN)
+        if upload:
+            return self._import()
+        if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
             return self.send_error(HTTPStatus.FORBIDDEN)
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
@@ -307,12 +397,56 @@ class Handler(SimpleHTTPRequestHandler):
             if path == "/api/queue/next":
                 player.next()
                 return self._json(player.status())
+            if path == "/api/config":
+                return self._json(write_config(body))
             if path == "/api/queue/stop":
                 player.stop()
                 return self._json(player.status())
         except Exception as e:
             return self._json({"ok": False, "error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
         self.send_error(HTTPStatus.NOT_FOUND)
+
+    def _drain(self, size):
+        """Read and discard a rejected upload, so the client sees the refusal rather than a reset."""
+        left = min(size, MAX_UPLOAD)
+        while left > 0:
+            chunk = self.rfile.read(min(1 << 20, left))
+            if not chunk:
+                return
+            left -= len(chunk)
+
+    def _import(self):
+        name = (self.headers.get("X-Filename") or "").strip()
+        size = int(self.headers.get("Content-Length") or 0)
+        def refuse(message, status=HTTPStatus.BAD_REQUEST):
+            self._drain(size)   # answering before reading the body only gets the client a reset
+            return self._json({"ok": False, "error": message}, status)
+
+        if not SAFE_UPLOAD.match(name):
+            return refuse("Needs to be the .zip Spotify sent you, or a .json from inside it.")
+        if size <= 0:
+            return refuse("That file is empty.")
+        if size > MAX_UPLOAD:
+            return refuse(f"File is {size / 1e6:.0f} MB; the limit is {MAX_UPLOAD / 1e6:.0f} MB.")
+        if importer.busy():
+            return refuse("An import is already running.", HTTPStatus.CONFLICT)
+        raw = ROOT / "data" / "raw"
+        raw.mkdir(parents=True, exist_ok=True)
+        path = raw / name                       # name is a bare filename, checked against SAFE_UPLOAD
+        try:
+            with path.open("wb") as f:
+                left = size
+                while left > 0:
+                    chunk = self.rfile.read(min(1 << 20, left))
+                    if not chunk:
+                        raise OSError("upload ended early")
+                    f.write(chunk)
+                    left -= len(chunk)
+        except Exception as e:
+            path.unlink(missing_ok=True)
+            return self._json({"ok": False, "error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+        importer.start(path)
+        return self._json({"ok": True, "name": name})
 
     def _audio(self, tid):
         path = crate.path(tid)

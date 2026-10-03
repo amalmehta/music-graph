@@ -469,6 +469,7 @@ def build(src, sample):
     graph = {
         "meta": {
             "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "sample": sample,
+            "source": src.name,
             "timezone": str(tz), "first": date(kept[0].end), "last": date(kept[-1].end), "months": months.labels(),
         },
         "stats": {

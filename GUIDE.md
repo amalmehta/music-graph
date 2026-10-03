@@ -20,7 +20,11 @@ Everything beyond the quick start in the [README](README.md): getting your data 
 2. Under **Download your data**, tick **Extended streaming history**, then click **Request data**.
 3. Click the confirmation link in the email Spotify sends you.
 4. Wait for the download email. Spotify says it can take up to 30 days, and the link expires after about 2 weeks.
-5. Put `my_spotify_data.zip`, or the unzipped folder, into `data/raw/`. Then run `build_data.py`.
+5. Open the app, click the ⚙ in the header, and drop `my_spotify_data.zip` on it. It saves the file to
+   `data/raw/` and runs `build_data.py` for you, showing the build log as it goes; a few minutes of listening
+   history takes seconds, a decade takes a minute or so.
+
+   Prefer the terminal? Put the zip (or the unzipped folder) in `data/raw/` yourself and run `build_data.py`.
 
 The older **Account data** package (the last year only, with no track IDs) also works, but it gives less detail.
 
@@ -43,10 +47,10 @@ For a library the size of a heavy listener's (about 320 artists and 87,000 plays
 Tests:
 
 ```bash
-python3 tests/test_queue.py . && node tests/test_djworker.mjs .
+python3 tests/test_queue.py . && python3 tests/test_import.py . && node tests/test_djworker.mjs .
 ```
 
-The first fakes Spotify and checks the play queue starts, advances when a song ends, keeps going when Spotify auto-plays something else, and steps aside when you pick a different track. The second checks tempo, beat grid and key detection against the generated test tracks (run `make_test_audio.py` first).
+The first fakes Spotify and checks the play queue starts, advances when a song ends, keeps going when Spotify auto-plays something else, and steps aside when you pick a different track. The second uploads a sample export to a throwaway copy of the project and checks the build runs, the refused filenames stay refused, and the Client ID round-trips. The third checks tempo, beat grid and key detection against the generated test tracks (run `make_test_audio.py` first).
 
 ## 3. Sync the light show to the sound
 
@@ -66,8 +70,9 @@ Without audio access, the light show still moves, driven by the album colors and
 Playing songs on this Mac works without any setup: the server controls the Spotify desktop app. Two features need a Spotify developer app: saving playlists, and showing Now Playing for music on your phone or other devices.
 
 1. Go to [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard) and create an app. Select **Web API**.
-2. Add the redirect URI `http://127.0.0.1:8765/callback`.
-3. Copy `config.example.json` to `config.json` and paste in your **Client ID**. No client secret is needed; the app uses PKCE.
+2. Add the redirect URI `http://127.0.0.1:8765/callback` — the ⚙ panel prints the exact one for your port.
+3. Click the ⚙ in the header and paste your **Client ID** into the Spotify field, then reload. No client secret
+   is needed; the app uses PKCE. (The terminal equivalent is copying `config.example.json` to `config.json`.)
 4. Under **User Management**, add the Spotify account you'll log in with.
 
 Spotify's February 2026 rules for development-mode apps apply: the app owner needs Spotify Premium, and each app allows at most 5 users.
@@ -142,6 +147,7 @@ python3 server.py --music-dir data/test_audio
 | `#network`, `#time`, `#habits`, `#poster`, `#foryou`, `#dj` | that tab |
 | `?np=off` | without Now Playing taking over (the header button still opens it) |
 | `?np=hide` | with the Now Playing pill hidden entirely, for clean screenshots |
+| `?setup=1` | with the setup panel open, for importing an export or pasting a Client ID |
 | `?theme=dark` / `?theme=light` | in a specific theme, whatever your system is set to |
 | `?bridges=1#network` | the network with only the links that cross between vibes |
 | `?poster=aurora&paper=light#poster` | a poster style and paper directly |
@@ -203,7 +209,7 @@ python3 server.py --music-dir data/test_audio
 | --- | --- |
 | `build_data.py` | Export → `data/graph_data.json` + `data/history_index.json` |
 | `make_sample_data.py` | Fictional export in the real format, for trying things out |
-| `server.py` | Local web server, now-playing check, album-art proxy, playback queue (standard library only) |
+| `server.py` | Local web server, now-playing check, album-art proxy, playback queue, export import (standard library only) |
 | `index.html`, `styles.css` | Page layout and styles, light and dark theme |
 | `app.js` | Header, date brush, Vibes / Network / Over time views |
 | `recs.js` | For you: vibe cards and playlists |
@@ -214,8 +220,9 @@ python3 server.py --music-dir data/test_audio
 | `make_test_audio.py` | Synthetic test tracks with known tempo and key |
 | `habits.js` | Hour × weekday grid and the calendar |
 | `poster.js` | Poster rendering and PNG / SVG export |
+| `setup.js` | Setup panel: import an export, show what it was built from, save a Client ID |
 | `util.js` | Shared helpers |
-| `tests/` | Play-queue test (faked Spotify) and DJ analysis test |
+| `tests/` | Play-queue test (faked Spotify), export-import test, and DJ analysis test |
 
 ---
 

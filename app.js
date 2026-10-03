@@ -7,6 +7,7 @@ import * as NowPlaying from "./nowplaying.js";
 import * as DJ from "./dj.js";
 import * as Habits from "./habits.js";
 import * as Poster from "./poster.js";
+import * as Setup from "./setup.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -867,8 +868,12 @@ async function main() {
   try {
     [state.graph, state.history] = await Promise.all([loadJSON("data/graph_data.json"), loadJSON("data/history_index.json")]);
   } catch {
-    document.querySelector("main").innerHTML = `<div class="viz-card" style="padding:24px"><h2>No data yet</h2>
-      <p>Run <code>.venv/bin/python build_data.py</code> (or <code>--sample</code>) and open this page through <code>server.py</code>.</p></div>`;
+    document.querySelector("main").innerHTML = `<div class="viz-card empty-first"><h2>Nothing here yet</h2>
+      <p>Import the listening history Spotify sent you and this fills up with your own music.</p>
+      <button class="primary-btn" id="empty-import">Import your export</button>
+      <p class="setup-sub">Prefer the terminal? <code>.venv/bin/python build_data.py</code>, or <code>--sample</code> to look around first.</p></div>`;
+    Setup.init(null);
+    document.getElementById("empty-import").addEventListener("click", () => Setup.open());
     return;
   }
   for (const [s, t, w, n] of state.graph.edges) {
@@ -877,6 +882,8 @@ async function main() {
   }
   state.neighbors.forEach((list) => list.sort((a, b) => b.w - a.w));
   $("#sample-badge").hidden = !state.graph.meta.sample;
+  $("#sample-badge").addEventListener("click", () => Setup.open());
+  Setup.init(state.graph.meta);
 
   setupTabs();
   setupBrush();

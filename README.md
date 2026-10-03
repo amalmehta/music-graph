@@ -11,16 +11,14 @@ uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python -r requi
 ```
 
 ```bash
-.venv/bin/python make_sample_data.py && .venv/bin/python build_data.py --sample
-```
-
-```bash
 python3 server.py --open
 ```
 
-That opens <http://127.0.0.1:8765> on generated sample data, so you can look around straight away.
+That opens <http://127.0.0.1:8765>. Drop the zip Spotify sent you onto the page and it builds your graph there — there is no second terminal step.
 
-**To use your own listening:** request your **Extended streaming history** from [spotify.com/account/privacy](https://www.spotify.com/account/privacy/), put the zip in `data/raw/`, and run `.venv/bin/python build_data.py`. Spotify can take up to 30 days to send it.
+**To get the zip:** request your **Extended streaming history** at [spotify.com/account/privacy](https://www.spotify.com/account/privacy/). Ask for the extended one, not the basic one; Spotify can take up to 30 days to send it.
+
+**No export yet?** `.venv/bin/python make_sample_data.py && .venv/bin/python build_data.py --sample` fills it with made-up listening so you can look around.
 
 Setup details, the DJ reference and how everything is computed are in the **[guide](GUIDE.md)**. The **[project brief](spotify_graph.md)** records every decision and what's been verified.
 
