@@ -500,11 +500,11 @@ def main():
     music_dir = args.music_dir or Path(os.path.expanduser(config.get("music_dir") or "~/Music"))
     crate = Crate(music_dir.resolve())
     if not (ROOT / "data" / "graph_data.json").exists():
-        print("data/graph_data.json is missing: run build_data.py first (or build_data.py --sample)")
+        print("data/graph_data.json is missing: import an export from the page, or run build_data.py", flush=True)
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     url = f"http://127.0.0.1:{args.port}"
-    print(f"Music graph running at {url}  (Ctrl+C to stop)")
-    print(f"DJ crate folder: {crate.root}")
+    print(f"Music graph running at {url}  (Ctrl+C to stop)", flush=True)
+    print(f"DJ crate folder: {display_path(crate.root)}", flush=True)
     if args.open:
         subprocess.run(["open", url])
     try:

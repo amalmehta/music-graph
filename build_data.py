@@ -99,6 +99,14 @@ def iter_rows(src: Path):
             yield from json.loads(p.read_text("utf-8"))
 
 
+def display_path(p):
+    """Shorten a path for messages, which end up on screen and in the import log."""
+    try:
+        return "~/" + str(Path(p).relative_to(Path.home()))
+    except ValueError:
+        return str(p)
+
+
 def parse_row(r):
     if "ts" in r:  # Extended streaming history
         if r.get("episode_name") or r.get("spotify_episode_uri") or r.get("audiobook_title") or r.get("audiobook_uri"):
@@ -206,7 +214,7 @@ def build(src, sample):
     tz = local_tz()
     plays = load_plays(src)
     if not plays:
-        sys.exit(f"No streaming history found in {src}")
+        sys.exit(f"No streaming history found in {display_path(src)}")
 
     # Skips come from all attempts; everything else only counts plays of 30s+.
     attempts, skips = Counter(), Counter()
@@ -543,7 +551,7 @@ def main():
     args = ap.parse_args()
     src = args.src or DATA / ("sample" if args.sample else "raw")
     if not src.exists():
-        sys.exit(f"{src} not found")
+        sys.exit(f"{display_path(src)} not found")
 
     graph, history = build(src, sample=args.sample and not args.src)
     for name, obj in (("graph_data.json", graph), ("history_index.json", history)):
