@@ -82,6 +82,8 @@ When a song plays, the page becomes a full-screen light show in the album's colo
 
 Two decks for audio files you own — Spotify's audio is protected, so it can't be mixed here. BPM and key detection, beat sync with key lock, loops, hot cues, EQ, filters, crossfader, and WAV recording of your mix.
 
+The crate also opens your Spotify playlists: each track says whether you own the audio, shows its BPM and key, and flags whether it mixes harmonically with the one above it. Tracks you don't own play through the Spotify desktop app so you can still audition them. When you're done, the set you played saves back to Spotify as a private playlist.
+
 ![DJ decks](screenshots/13-dj-synced.png)
 
 The light show at the top of this page is a live mix: both decks' colors in the aurora, both waveforms and the crossfader on screen.

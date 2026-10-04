@@ -434,3 +434,13 @@ kbd { font: 600 10px var(--font); padding: 1px 5px; border-radius: 4px; border: 
 .empty-first { padding: 28px; text-align: center; }
 .empty-first h2 { font-family: var(--display); margin: 0 0 6px; }
 .empty-first .primary-btn { margin: 14px 0 12px; }
+
+/* DJ crate: a Spotify playlist, with what you can actually mix marked */
+#crate-playlist { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 99px; padding: 8px 12px; font: inherit; font-size: 13px; max-width: 220px; }
+.crate-table tr.not-owned td { opacity: 0.55; }
+.crate-table tr.not-owned .c-title { font-style: italic; }
+.mix-yes, .mix-no, .mix-missing { font-size: 11px; letter-spacing: 0.02em; }
+.mix-yes { color: #4ad99a; }
+.mix-no { color: var(--ink-dim); }
+.mix-missing { color: var(--ink-dim); }
+.load-btn.preview { background: rgba(255, 255, 255, 0.08); color: var(--ink); }

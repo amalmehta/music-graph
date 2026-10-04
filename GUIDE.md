@@ -47,10 +47,10 @@ For a library the size of a heavy listener's (about 320 artists and 87,000 plays
 Tests:
 
 ```bash
-python3 tests/test_queue.py . && python3 tests/test_import.py . && node tests/test_djworker.mjs .
+python3 tests/test_queue.py . && python3 tests/test_import.py . && node tests/test_djworker.mjs . && node tests/test_setlist.mjs .
 ```
 
-The first fakes Spotify and checks the play queue starts, advances when a song ends, keeps going when Spotify auto-plays something else, and steps aside when you pick a different track. The second uploads a sample export to a throwaway copy of the project and checks the build runs, the refused filenames stay refused, and the Client ID round-trips. The third checks tempo, beat grid and key detection against the generated test tracks (run `make_test_audio.py` first).
+The first fakes Spotify and checks the play queue starts, advances when a song ends, keeps going when Spotify auto-plays something else, and steps aside when you pick a different track. The second uploads a sample export to a throwaway copy of the project and checks the build runs, the refused filenames stay refused, and the Client ID round-trips. The third checks tempo, beat grid and key detection against the generated test tracks (run `make_test_audio.py` first). The fourth covers the playlist logic that needs no Spotify account: harmonic mixing on the Camelot wheel, matching a playlist against the files you own, and the set list a saved playlist is built from.
 
 ## 3. Sync the light show to the sound
 
@@ -83,9 +83,17 @@ Spotify's February 2026 rules for development-mode apps apply: the app owner nee
 
 - **Music folder:** the crate lists every audio file under `~/Music`. To use another folder, set `"music_dir"` in `config.json`, or start the server with `--music-dir /path/to/folder`. Click **Rescan** after adding files.
 - **Drag & drop:** drop files onto a deck to load them, or onto the crate to add them. You can also use **Add files**.
+- **Spotify playlist:** the third crate tab lists your playlists (needs the Client ID from §4). Each track says whether
+  you own the audio: the ones you do get **A** / **B** to load onto a deck, with BPM, key and a **mixes** / **jump** hint
+  against the track above it, so a playlist doubles as a set list. The ones you don't own get ▶, which plays them through
+  the Spotify desktop app — an audition, not a deck, because the audio is protected. BPM and key are filled in from your own
+  files the first time each one goes on a deck.
+- **Save set to Spotify:** once you have played two or more tracks, **Save set to Spotify** writes them to a new private
+  playlist in the order you played them. A track is included if it came from a playlist row or matches your streaming
+  history; anything Spotify doesn't know is left out and the count is reported.
 - **By link:** `?deckA=neon&deckB=glass#dj` loads crate tracks whose title or artist matches, handy for reopening a pair. Add `&sync=B` to beat-match on open, and `&play=1&lightshow=1` to start both decks straight into the light show (browsers may still require a click before audio starts).
 - **Formats:** MP3, M4A/AAC, WAV, AIFF, FLAC and OGG. DRM-protected downloads, such as Apple Music or Spotify offline files, can't be decoded.
-- **Why not Spotify?** Spotify's audio is protected, so Spotify songs can't be mixed here.
+- **Why not Spotify?** Spotify's audio is protected (encrypted, with no access to the decoded samples), so it can't be beat-matched, key-locked or crossfaded. An account also only streams to one device at a time, so two Spotify decks could not play together. Playlists are therefore a way to choose and audition what to mix, not a source of deck audio.
 - **Your history:** files whose title and artist match your streaming history show your Spotify play count and vibe color.
 
 **On each deck:**
@@ -222,7 +230,7 @@ python3 server.py --music-dir data/test_audio
 | `poster.js` | Poster rendering and PNG / SVG export |
 | `setup.js` | Setup panel: import an export, show what it was built from, save a Client ID |
 | `util.js` | Shared helpers |
-| `tests/` | Play-queue test (faked Spotify), export-import test, and DJ analysis test |
+| `tests/` | Play-queue test (faked Spotify), export-import test, DJ analysis test, and playlist/set-list test |
 
 ---
 
