@@ -7,6 +7,7 @@ const MAX_UPLOAD = 1_000_000_000;
 
 let meta = null;
 let polling = null;
+let startedAt = 0;
 
 export function init(graphMeta) {
   meta = graphMeta;
@@ -77,6 +78,7 @@ async function send(file) {
   if (file.size > MAX_UPLOAD) {
     return toast(`${(file.size / 1e6).toFixed(0)} MB is past the ${MAX_UPLOAD / 1e6} MB limit.`, { error: true });
   }
+  startedAt = 0;   // a leftover anchor from an earlier import would flash a wild number
   progress("building", [`Uploading ${file.name}…`]);
   try {
     const res = await fetch("/api/import", {
@@ -93,30 +95,48 @@ async function send(file) {
   watch();
 }
 
-function watch() {
-  clearInterval(polling);
-  polling = setInterval(async () => {
-    let status;
-    try {
-      status = await (await fetch("/api/import")).json();
-    } catch {
-      return;   // the server restarting mid-build should not wipe the panel
-    }
-    progress(status.state, status.lines, status.seconds);
-    if (status.state === "done" || status.state === "error") clearInterval(polling);
-  }, 700);
+async function poll() {
+  let status;
+  try {
+    status = await (await fetch("/api/import")).json();
+  } catch {
+    return;   // the server restarting mid-build should not wipe the panel
+  }
+  // Anchor the clock to this machine. A hidden tab has its timers throttled, so echoing the
+  // server's own count leaves a stale number on screen until the next poll happens to land.
+  if (status.state === "building") startedAt = Date.now() - status.seconds * 1000;
+  progress(status.state, status.lines);
+  if (status.state === "done" || status.state === "error") stopWatching();
 }
 
-function progress(state, lines, seconds = 0) {
+function onVisible() {
+  if (!document.hidden) poll();   // catch up the moment anyone can see it again
+}
+
+function stopWatching() {
+  clearInterval(polling);
+  polling = null;
+  document.removeEventListener("visibilitychange", onVisible);
+}
+
+function watch() {
+  stopWatching();
+  polling = setInterval(poll, 700);
+  document.addEventListener("visibilitychange", onVisible);
+  poll();
+}
+
+function progress(state, lines) {
   const box = $("#import-progress");
   const log = $("#import-log");
+  const seconds = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
   box.hidden = false;
   box.dataset.state = state;
   $("#import-drop").hidden = state === "building";
   log.textContent = (lines || []).join("\n");
   log.scrollTop = log.scrollHeight;
   $("#import-state").textContent =
-    state === "building" ? `Building your graph… ${seconds ? `${Math.round(seconds)}s` : ""}`
+    state === "building" ? `Building your graph… ${seconds ? `${seconds}s` : ""}`
     : state === "error" ? "That didn't work."
     : "Done.";
   $("#import-reload").hidden = state !== "done";
