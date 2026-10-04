@@ -897,7 +897,10 @@ async function main() {
   showView(views[location.hash.slice(1)] ? location.hash.slice(1) : "vibes");
 
   const resume = Spotify.takeResume();
-  if (resume) {
+  if (resume?.type === "playlists" || resume?.type === "set") {
+    showView("dj");                  // the login was started from the DJ crate, so come back to it
+    DJ.resume(resume);
+  } else if (resume) {
     showView("foryou");
     Recs.resume(resume);
   }

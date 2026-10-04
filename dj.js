@@ -1,8 +1,9 @@
 // DJ tab: two decks with beat-matching, key lock, EQ, filters, loops and hot cues, a crossfader,
 // WAV recording, and a full-screen mode that drives the Now Playing light show.
 
-import { trackKey, escapeHtml, fmtInt, vibeColor, store, toast } from "./util.js";
+import { trackKey, escapeHtml, fmtInt, vibeColor, store, toast, postJSON } from "./util.js";
 import * as NowPlaying from "./nowplaying.js";
+import * as Spotify from "./spotify.js";
 
 const $ = (s, root = document) => root.querySelector(s);
 const DECK_COLORS = { A: "#ff4f8b", B: "#35d0c0" };
@@ -31,6 +32,11 @@ let ctx = null, masterGain = null, analyser = null;
 const decks = {};
 let xfade = 0.5, masterVolume = 0.9;
 let crate = { tracks: [], dir: "", loaded: false }, dropped = [], crateSource = "folder", crateQuery = "";
+let playlists = null;            // the user's Spotify playlists, once fetched
+let playlist = null;             // { id, name, tracks } currently shown in the crate
+let playlistError = "";
+let crateByKey = new Map();      // title|artist -> the audio file you own, so a playlist knows what is mixable
+let setList = [];                // what you actually loaded onto a deck, in order
 let historyByKey = new Map();
 let recording = null, recorderReady = false;
 let rafId = 0, fullscreen = false, lastHud = 0, lastPaletteKey = "";
@@ -227,6 +233,7 @@ class Deck {
       const buffer = await ctx.decodeAudioData(bytes);
       if (token !== this.token) return;
       this.buffer = buffer;
+      noteSet(item);
       item.duration ??= buffer.duration;
       const saved = trackStore()[item.cacheKey];
       if (saved?.hot) this.hot = saved.hot;
@@ -598,11 +605,131 @@ function drawDualWave(canvas, now) {
 
 function crateItems() {
   const saved = trackStore();
-  const items = crateSource === "folder" ? crate.tracks : dropped;
   const q = crateQuery.trim().toLowerCase();
-  return items
-    .filter((t) => !q || `${t.title} ${t.artist} ${t.album ?? ""}`.toLowerCase().includes(q))
+  const matches = (t) => !q || `${t.title} ${t.artist} ${t.album ?? ""}`.toLowerCase().includes(q);
+  if (crateSource === "spotify") {
+    return (playlist?.tracks ?? []).filter(matches).map((t) => {
+      const owned = ownedFile(t);
+      // BPM and key come from the file you own, analysed the last time it was on a deck.
+      return { ...t, owned, cacheKey: owned?.cacheKey, id: owned?.id, saved: owned && saved[owned.cacheKey] };
+    });
+  }
+  return (crateSource === "folder" ? crate.tracks : dropped)
+    .filter(matches)
     .map((t) => ({ ...t, saved: saved[t.cacheKey] }));
+}
+
+function emptyCrateNote() {
+  if (crateSource === "folder") return crate.loaded ? "No audio files match." : "";
+  if (crateSource === "dropped") return "";
+  if (playlistError && playlistError !== "connect") return "";
+  return playlist && playlist.tracks ? "Nothing in this playlist matches." : "";
+}
+
+// ---------- Spotify playlists ----------
+
+const CAMELOT = /^(\d{1,2})([AB])$/;
+
+// Harmonic mixing, the usual Camelot wheel rules: same key, its relative major or minor,
+// or one step around the wheel.
+function mixesWith(a, b) {
+  const x = CAMELOT.exec(a || ""), y = CAMELOT.exec(b || "");
+  if (!x || !y) return false;
+  const [n, m] = [+x[1], +y[1]];
+  if (n === m) return true;                                  // same number: same key or its relative
+  return x[2] === y[2] && (m === (n % 12) + 1 || n === (m % 12) + 1);
+}
+
+function ownedFile(track) {
+  return crateByKey.get(trackKey(track.title, track.artist));
+}
+
+async function openPlaylists() {
+  playlistError = "";
+  if (!Spotify.configured()) {
+    playlistError = "Add a Spotify Client ID in the ⚙ panel first.";
+  } else if (!Spotify.connected()) {
+    playlistError = "connect";
+  } else if (!playlists) {
+    try {
+      playlists = await Spotify.listPlaylists();
+    } catch (e) {
+      playlists = null;
+      playlistError = e.message;
+    }
+  }
+  fillPlaylistPicker();
+  renderCrate();
+  if (playlists?.length && !playlist) choosePlaylist(playlists[0].id);
+}
+
+function fillPlaylistPicker() {
+  const sel = $("#crate-playlist");
+  sel.hidden = crateSource !== "spotify" || !playlists?.length;
+  if (sel.hidden) return;
+  sel.innerHTML = playlists.map((p) =>
+    `<option value="${escapeHtml(p.id)}"${p.id === playlist?.id ? " selected" : ""}>${escapeHtml(p.name)} (${fmtInt(p.count)})</option>`).join("");
+}
+
+async function choosePlaylist(id) {
+  const meta = playlists?.find((p) => p.id === id);
+  if (!meta) return;
+  playlist = { id, name: meta.name, tracks: null };
+  playlistError = "";
+  renderCrate();
+  try {
+    playlist.tracks = await Spotify.playlistTracks(id);
+  } catch (e) {
+    playlist.tracks = [];
+    playlistError = e.message;
+  }
+  fillPlaylistPicker();
+  renderCrate();
+}
+
+// Spotify's audio is protected, so a playlist track you don't own as a file can still be
+// auditioned through the desktop app — it just can't go on a deck.
+async function preview(uri) {
+  try {
+    await postJSON("/api/play", { uris: [uri] });
+  } catch (e) {
+    toast(e.message === "Failed to fetch" ? "Can't reach the local server." : e.message, { error: true });
+  }
+}
+
+// ---------- the set you actually played ----------
+
+function noteSet(item) {
+  const last = setList[setList.length - 1];
+  if (last && last.cacheKey === item.cacheKey) return;        // reloading the same track is not a new entry
+  const hist = historyByKey.get(trackKey(item.title, item.artist));
+  setList.push({
+    cacheKey: item.cacheKey, title: item.title, artist: item.artist,
+    uri: item.spotifyUri || hist?.u?.[0] || null,
+  });
+  $("#set-save").hidden = setList.length < 2;
+}
+
+async function saveSet() {
+  const uris = setList.map((t) => t.uri).filter(Boolean);
+  const missing = setList.length - uris.length;
+  if (!uris.length) return toast("None of the tracks you played could be matched to Spotify.", { error: true });
+  if (!Spotify.configured()) return toast("Add a Spotify Client ID in the ⚙ panel to save a set.", { error: true });
+  if (!Spotify.connected()) return Spotify.login({ type: "set" });
+  const button = $("#set-save");
+  button.disabled = true;
+  button.textContent = "Saving…";
+  try {
+    const name = `DJ set · ${new Date().toLocaleDateString()}`;
+    const playlistSaved = await Spotify.savePlaylist(name, `${uris.length} tracks, in the order I played them.`, uris);
+    toast(`Saved “${escapeHtml(name)}”${missing ? ` (${missing} not on Spotify)` : ""}. <a href="${escapeHtml(playlistSaved.url)}" target="_blank" rel="noopener">Open it</a>`, { html: true });
+    playlists = null;                                          // the new one should show up in the picker
+  } catch (e) {
+    toast(e.message, { error: true });
+  } finally {
+    button.disabled = false;
+    button.textContent = "Save set to Spotify";
+  }
 }
 
 function renderCrate() {
@@ -615,24 +742,69 @@ function renderCrate() {
     dirNote.textContent = !crate.loaded ? "Scanning your music folder…"
       : crate.exists === false ? `Music folder not found: ${crate.dir}. Set "music_dir" in config.json or start the server with --music-dir.`
       : `${fmtInt(crate.tracks.length)} audio files in ${crate.dir}${crate.truncated ? " (first 10,000)" : ""}`;
-  } else {
+  } else if (crateSource === "dropped") {
     dirNote.textContent = dropped.length ? "Files you dropped this session (not saved when you reload)." : "Drop audio files onto a deck or anywhere in this crate.";
+  } else {
+    dirNote.innerHTML = playlistNote();
   }
+  $("#crate-col-6").textContent = crateSource === "spotify" ? "Mix" : "Spotify plays";
+  fillPlaylistPicker();
   const shown = items.slice(0, 500);
+  let lastKey = null;                      // the Camelot key of the previous track you own, for the mix hint
   body.innerHTML = shown.map((t) => {
     const hist = historyByKey.get(trackKey(t.title, t.artist));
-    return `
+    const bpm = t.saved?.bpm ? t.saved.bpm.toFixed(1) : "—";
+    const key = t.saved?.camelot
+      ? `<span class="key-badge" style="background:${camelotColor(t.saved.camelot)}" title="${escapeHtml(t.saved.key)}">${t.saved.camelot}</span>`
+      : "—";
+    if (crateSource !== "spotify") {
+      return `
     <tr draggable="true" data-key="${escapeHtml(t.cacheKey)}">
       <td class="c-title">${escapeHtml(t.title)}</td>
       <td class="c-artist">${escapeHtml(t.artist || "—")}</td>
       <td class="num">${t.duration ? fmtTime(t.duration) : "—"}</td>
-      <td class="num">${t.saved?.bpm ? t.saved.bpm.toFixed(1) : "—"}</td>
-      <td>${t.saved?.camelot ? `<span class="key-badge" style="background:${camelotColor(t.saved.camelot)}" title="${escapeHtml(t.saved.key)}">${t.saved.camelot}</span>` : "—"}</td>
+      <td class="num">${bpm}</td>
+      <td>${key}</td>
       <td>${hist ? `<span class="swatch" style="background:${vibeColor(hist.v)}"></span>${fmtInt(hist.p)}` : "—"}</td>
       <td class="load"><button class="load-btn a" data-load="A">A</button><button class="load-btn b" data-load="B">B</button></td>
     </tr>`;
-  }).join("") || `<tr><td colspan="7" class="empty-row">${crateSource === "folder" && crate.loaded ? "No audio files match." : ""}</td></tr>`;
+    }
+    // A playlist row: mixable only if you own the audio, since Spotify's own stream can't go on a deck.
+    const mix = t.saved?.camelot
+      ? (lastKey === null ? "" : mixesWith(lastKey, t.saved.camelot)
+        ? `<span class="mix-yes" title="Mixes with ${escapeHtml(lastKey)} — same key, its relative, or one step round the wheel">mixes</span>`
+        : `<span class="mix-no" title="A key jump from ${escapeHtml(lastKey)}">jump</span>`)
+      : "";
+    if (t.saved?.camelot) lastKey = t.saved.camelot;
+    return `
+    <tr${t.owned ? ' draggable="true"' : ' class="not-owned"'} data-key="${escapeHtml(t.cacheKey || "")}" data-uri="${escapeHtml(t.uri)}">
+      <td class="c-title">${escapeHtml(t.title)}</td>
+      <td class="c-artist">${escapeHtml(t.artist || "—")}</td>
+      <td class="num">${t.duration ? fmtTime(t.duration) : "—"}</td>
+      <td class="num">${t.owned ? bpm : ""}</td>
+      <td>${t.owned ? key : ""}</td>
+      <td>${t.owned ? mix : '<span class="mix-missing">not in your folder</span>'}</td>
+      <td class="load">${t.owned ? '<button class="load-btn a" data-load="A">A</button><button class="load-btn b" data-load="B">B</button>' : ""}<button class="load-btn preview" data-preview="1" title="Play it through the Spotify desktop app">▶</button></td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="7" class="empty-row">${emptyCrateNote()}</td></tr>`;
   if (items.length > shown.length) body.insertAdjacentHTML("beforeend", `<tr><td colspan="7" class="empty-row">Showing 500 of ${fmtInt(items.length)}. Search to narrow it down.</td></tr>`);
+}
+
+function playlistNote() {
+  if (playlistError === "connect") return 'Connect to Spotify to see your playlists. <button class="link-btn" id="crate-connect">Connect</button>';
+  if (playlistError) return escapeHtml(playlistError);
+  if (!playlist) return "Loading your playlists…";
+  if (!playlist.tracks) return `Loading ${escapeHtml(playlist.name)}…`;
+  const owned = playlist.tracks.filter(ownedFile).length;
+  return `${fmtInt(owned)} of ${fmtInt(playlist.tracks.length)} tracks are in your music folder and can go on a deck. `
+    + "The rest play through the Spotify desktop app — its audio is protected, so it can't be mixed. "
+    + "BPM and key come from your own files, filled in once a track has been on a deck.";
+}
+
+function rowItem(row) {
+  const item = row.dataset.key && findItem(row.dataset.key);
+  if (!item) return null;
+  return row.dataset.uri ? { ...item, spotifyUri: row.dataset.uri } : item;
 }
 
 function findItem(cacheKey) {
@@ -671,6 +843,7 @@ async function loadCrate(refresh = false) {
   try {
     const data = await (await fetch(`/api/crate${refresh ? "?refresh=1" : ""}`)).json();
     crate = { ...data, loaded: true, tracks: data.tracks.map((t) => ({ ...t, cacheKey: `crate:${t.id}` })) };
+    crateByKey = new Map(crate.tracks.map((t) => [trackKey(t.title, t.artist), t]));
   } catch {
     crate = { tracks: [], dir: "your music folder", loaded: true, exists: false };
   }
@@ -973,6 +1146,12 @@ function wireGlobal() {
     crateSource = b.dataset.src;
     $("#crate-tabs").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
     renderCrate();
+    if (crateSource === "spotify") openPlaylists();
+  });
+  $("#crate-playlist").addEventListener("change", (e) => choosePlaylist(e.target.value));
+  $("#set-save").addEventListener("click", saveSet);
+  $("#crate-dir").addEventListener("click", (e) => {
+    if (e.target.id === "crate-connect") Spotify.login({ type: "playlists" });
   });
   $("#crate-search").addEventListener("input", (e) => { crateQuery = e.target.value; renderCrate(); });
   $("#crate-refresh").addEventListener("click", () => loadCrate(true));
@@ -986,14 +1165,17 @@ function wireGlobal() {
   });
   const body = $("#crate-body");
   body.addEventListener("click", (e) => {
+    const row = e.target.closest("tr");
+    if (!row) return;
+    if (e.target.closest("[data-preview]")) return preview(row.dataset.uri);
     const b = e.target.closest("[data-load]");
     if (!b) return;
-    const item = findItem(b.closest("tr").dataset.key);
+    const item = rowItem(row);
     if (item) decks[b.dataset.load].load(item);
   });
   body.addEventListener("dblclick", (e) => {
     const row = e.target.closest("tr[data-key]");
-    const item = row && findItem(row.dataset.key);
+    const item = row && rowItem(row);
     if (item) (decks.A.buffer && !decks.B.buffer ? decks.B : decks.A.playing ? decks.B : decks.A).load(item);
   });
   body.addEventListener("dragstart", (e) => {
@@ -1034,6 +1216,14 @@ function wireGlobal() {
 }
 
 export { decks }; // read-only handle for debugging from the console
+
+// Coming back from a Spotify login that was started here.
+export function resume(action) {
+  crateSource = "spotify";
+  $("#crate-tabs").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.src === "spotify")));
+  openPlaylists();
+  if (action.type === "set") toast("Connected. Play a few tracks and save the set when you're done.");
+}
 
 export function init(a) {
   api = a;

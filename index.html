@@ -205,15 +205,18 @@
             <div class="segmented" id="crate-tabs">
               <button data-src="folder" aria-pressed="true">Music folder</button>
               <button data-src="dropped" aria-pressed="false">Dropped files <span id="dropped-count"></span></button>
+              <button data-src="spotify" aria-pressed="false">Spotify playlist</button>
             </div>
+            <select id="crate-playlist" hidden aria-label="Which playlist"></select>
             <input type="search" id="crate-search" placeholder="Search title or artist…" autocomplete="off">
             <button class="ghost-btn" id="crate-refresh">Rescan</button>
             <label class="ghost-btn file-btn">Add files<input type="file" id="crate-files" accept="audio/*,.mp3,.m4a,.wav,.aiff,.aif,.flac,.ogg" multiple hidden></label>
+            <button class="ghost-btn" id="set-save" hidden>Save set to Spotify</button>
           </div>
           <p class="crate-dir" id="crate-dir"></p>
           <div class="crate-table-wrap">
             <table class="crate-table">
-              <thead><tr><th>Title</th><th>Artist</th><th class="num">Time</th><th class="num">BPM</th><th>Key</th><th>Spotify plays</th><th>Load</th></tr></thead>
+              <thead><tr><th>Title</th><th>Artist</th><th class="num">Time</th><th class="num">BPM</th><th>Key</th><th id="crate-col-6">Spotify plays</th><th>Load</th></tr></thead>
               <tbody id="crate-body"></tbody>
             </table>
           </div>

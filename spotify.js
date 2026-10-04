@@ -4,7 +4,7 @@
 
 import { store } from "./util.js";
 
-const SCOPES = "user-read-currently-playing user-read-playback-state playlist-modify-private";
+const SCOPES = "user-read-currently-playing user-read-playback-state playlist-modify-private playlist-read-private playlist-read-collaborative";
 const TOKEN_KEY = "spotify-token";
 const redirectUri = () => `${location.origin}/callback`;
 
@@ -106,6 +106,51 @@ export async function currentlyPlaying() {
     track_uri: item.uri, artwork_url: item.album?.images?.[0]?.url ?? null,
     position_ms: data.progress_ms ?? 0, duration_ms: item.duration_ms ?? 0,
   };
+}
+
+// Reading playlists needs scopes a token from before this feature won't carry, so say so plainly
+// rather than surfacing Spotify's "Insufficient client scope".
+function scopeError(e) {
+  return /scope/i.test(e.message) ? new Error("Reconnect to Spotify: reading your playlists needs a permission the old login didn't ask for.") : e;
+}
+
+export async function listPlaylists() {
+  const out = [];
+  let url = "/me/playlists?limit=50";
+  try {
+    while (url && out.length < 400) {
+      const page = await api(url);
+      for (const p of page?.items ?? []) {
+        if (p) out.push({ id: p.id, name: p.name, count: p.tracks?.total ?? 0, owner: p.owner?.display_name ?? "" });
+      }
+      url = page?.next ? page.next.replace("https://api.spotify.com/v1", "") : null;
+    }
+  } catch (e) {
+    throw scopeError(e);
+  }
+  return out;
+}
+
+export async function playlistTracks(id) {
+  const out = [];
+  let url = `/playlists/${id}/tracks?limit=100&fields=next,items(track(uri,name,album(name),duration_ms,artists(name)))`;
+  try {
+    while (url && out.length < 2000) {
+      const page = await api(url);
+      for (const row of page?.items ?? []) {
+        const t = row?.track;
+        if (!t?.uri || !t.name) continue;                       // local files and removed tracks have no uri
+        out.push({
+          uri: t.uri, title: t.name, artist: t.artists?.[0]?.name ?? "",
+          album: t.album?.name ?? "", duration: (t.duration_ms ?? 0) / 1000,
+        });
+      }
+      url = page?.next ? page.next.replace("https://api.spotify.com/v1", "") : null;
+    }
+  } catch (e) {
+    throw scopeError(e);
+  }
+  return out;
 }
 
 export async function savePlaylist(name, description, uris) {
