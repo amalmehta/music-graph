@@ -24,6 +24,12 @@ Setup details, the DJ reference and how everything is computed are in the **[gui
 
 ---
 
+## Your data
+
+The ⚙ in the header takes the zip Spotify sent you, runs the build and shows the log as it goes. It also says what the graph was built from and how long ago, so you know whether you are looking at something stale. Pasting a Spotify Client ID here turns on Play and Save.
+
+![The setup panel, having just built a graph from an export](screenshots/17-import.png)
+
 ## Vibes
 
 Artists you play in the same sessions are grouped into "vibes", named by when you play them. Arcs show what bridges one vibe to another, and the panel says why: how often you switch mid-session, which direction you drift, and the song you usually cross over on.
