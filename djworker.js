@@ -43,10 +43,76 @@ function analyze(mono, sampleRate) {
     confidence: tempo.confidence,
     key: key.name,
     camelot: key.camelot,
+    melody: melody(x, sr),
     overview: bands(x, low, lowMid, Math.ceil(x.length / OVERVIEW_BINS)),
     detail: bands(x, low, lowMid, Math.max(1, Math.round(sr / DETAIL_RATE))),
     detailRate: sr / Math.max(1, Math.round(sr / DETAIL_RATE)),
   };
+}
+
+const MELODY_BINS = 1400;      // points across the whole track, enough for a smooth ribbon
+const MELODY_LO = 65;          // C2 — below this is bass, not the tune
+const MELODY_HI = 1100;        // C6 — above this is mostly harmonics and cymbals
+
+// The shape of the tune: the strongest pitch in each frame, as a MIDI note.
+// Autocorrelation via the FFT (Wiener–Khinchin), so a whole track costs two transforms a frame.
+function melody(x, sr) {
+  const N = 2048, FFTN = 4096;
+  const hop = Math.max(256, Math.floor((x.length - N) / MELODY_BINS));
+  if (x.length < N * 2) return { midi: new Float32Array(0), rate: 1 };
+  const win = new Float64Array(N).map((_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1)));
+  const re = new Float64Array(FFTN), im = new Float64Array(FFTN);
+  const minLag = Math.max(2, Math.floor(sr / MELODY_HI));
+  const maxLag = Math.min(Math.floor(sr / MELODY_LO), N - 1);
+  const out = [];
+
+  for (let start = 0; start + N <= x.length; start += hop) {
+    re.fill(0); im.fill(0);
+    let power = 0;
+    for (let i = 0; i < N; i++) {
+      const v = x[start + i] * win[i];
+      re[i] = v;
+      power += v * v;
+    }
+    if (power < 1e-6) { out.push(NaN); continue; }              // silence has no tune
+    fft(re, im);
+    for (let k = 0; k < FFTN; k++) { re[k] = re[k] * re[k] + im[k] * im[k]; im[k] = 0; }
+    fft(re, im);                                                // of a real even spectrum, so this inverts it
+    const zero = re[0];
+    if (zero <= 0) { out.push(NaN); continue; }
+
+    // The highest peak is often an octave too low, so take the shortest lag that gets close to it.
+    let best = 0;
+    for (let lag = minLag; lag <= maxLag; lag++) if (re[lag] > best) best = re[lag];
+    const floorValue = best * 0.85;
+    let pick = -1;
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      if (re[lag] >= floorValue && re[lag] > re[lag - 1] && re[lag] >= re[lag + 1]) { pick = lag; break; }
+    }
+    if (pick < 0 || best / zero < 0.3) { out.push(NaN); continue; }   // noisy or unpitched: leave a gap
+
+    // Parabolic interpolation, so the line glides instead of stepping between lags.
+    const a = re[pick - 1], b = re[pick], c = re[pick + 1];
+    const shift = (a - c) / (2 * (a - 2 * b + c)) || 0;
+    out.push(69 + 12 * Math.log2(sr / (pick + shift) / 440));
+  }
+  return { midi: medianSmooth(out), rate: sr / hop };
+}
+
+// A short median filter kills the odd octave jump without rounding off real leaps.
+function medianSmooth(values) {
+  const out = new Float32Array(values.length);
+  const window = [];
+  for (let i = 0; i < values.length; i++) {
+    window.length = 0;
+    for (let j = Math.max(0, i - 2); j <= Math.min(values.length - 1, i + 2); j++) {
+      if (!Number.isNaN(values[j])) window.push(values[j]);
+    }
+    if (window.length < 2) { out[i] = NaN; continue; }
+    window.sort((p, q) => p - q);
+    out[i] = window[window.length >> 1];
+  }
+  return out;
 }
 
 function onePole(x, sr, cutoff) {

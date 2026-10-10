@@ -74,7 +74,7 @@ Pick a vibe and get a playlist built from your own history: songs you love that 
 
 ## Now Playing
 
-When a song plays, the page becomes a full-screen light show in the album's colors. It reacts to the actual sound through your mic (or BlackHole), and shows where the song sits in your taste map and your history with it.
+When a song plays, the page becomes a full-screen light show in the album's colors. It reacts to the actual sound through your mic (or BlackHole), draws the melody as a line running across the backdrop — time left to right, pitch up the screen — and shows where the song sits in your taste map and your history with it.
 
 ![Now Playing](screenshots/now-playing.png)
 

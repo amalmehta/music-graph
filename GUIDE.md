@@ -47,10 +47,10 @@ For a library the size of a heavy listener's (about 320 artists and 87,000 plays
 Tests:
 
 ```bash
-python3 tests/test_queue.py . && python3 tests/test_import.py . && node tests/test_djworker.mjs . && node tests/test_setlist.mjs .
+python3 tests/test_queue.py . && python3 tests/test_import.py . && node tests/test_djworker.mjs . && node tests/test_setlist.mjs . && node tests/test_melody.mjs .
 ```
 
-The first fakes Spotify and checks the play queue starts, advances when a song ends, keeps going when Spotify auto-plays something else, and steps aside when you pick a different track. The second uploads a sample export to a throwaway copy of the project and checks the build runs, the refused filenames stay refused, and the Client ID round-trips. The third checks tempo, beat grid and key detection against the generated test tracks (run `make_test_audio.py` first). The fourth covers the playlist logic that needs no Spotify account: harmonic mixing on the Camelot wheel, matching a playlist against the files you own, and the set list a saved playlist is built from.
+The first fakes Spotify and checks the play queue starts, advances when a song ends, keeps going when Spotify auto-plays something else, and steps aside when you pick a different track. The second uploads a sample export to a throwaway copy of the project and checks the build runs, the refused filenames stay refused, and the Client ID round-trips. The third checks tempo, beat grid and key detection against the generated test tracks (run `make_test_audio.py` first). The fourth covers the playlist logic that needs no Spotify account: harmonic mixing on the Camelot wheel, matching a playlist against the files you own, and the set list a saved playlist is built from. The fifth checks the melody detector against signals whose pitch is known by construction — steady notes, a two-octave glide, an octave leap, silence and noise.
 
 ## 3. Sync the light show to the sound
 
@@ -64,6 +64,8 @@ For a clean signal with no room noise, install [BlackHole](https://existential.a
 4. In Now Playing, pick **BlackHole 2ch** from the input menu.
 
 Without audio access, the light show still moves, driven by the album colors and song progress.
+
+Once it can hear the music, a line of the melody runs across the backdrop: time left to right, pitch up the screen, with a glowing head on the note playing now. It reads the strongest pitch in each frame, eases small wobbles but lets real leaps through, and breaks where nothing is pitched — so drum passages leave gaps rather than inventing notes. The vertical range follows the notes in view, so a bassline and a topline both fill the height. With no sound it falls back to a slow breathing wave.
 
 ## 4. Save playlists to Spotify
 
@@ -95,6 +97,8 @@ Spotify's February 2026 rules for development-mode apps apply: the app owner nee
 - **Formats:** MP3, M4A/AAC, WAV, AIFF, FLAC and OGG. DRM-protected downloads, such as Apple Music or Spotify offline files, can't be decoded.
 - **Why not Spotify?** Spotify's audio is protected (encrypted, with no access to the decoded samples), so it can't be beat-matched, key-locked or crossfaded. An account also only streams to one device at a time, so two Spotify decks could not play together. Playlists are therefore a way to choose and audition what to mix, not a source of deck audio.
 - **Your history:** files whose title and artist match your streaming history show your Spotify play count and vibe color.
+
+- **Melody:** under each deck's waveform, a line of the tune's rises and falls — the strongest pitch in every frame, scaled to the notes that track actually uses, with gaps where nothing is pitched (drums, silence). It is worked out from the decoded file when the track loads, so it covers the whole song, not just the part you have heard.
 
 **On each deck:**
 
@@ -230,7 +234,7 @@ python3 server.py --music-dir data/test_audio
 | `poster.js` | Poster rendering and PNG / SVG export |
 | `setup.js` | Setup panel: import an export, show what it was built from, save a Client ID |
 | `util.js` | Shared helpers |
-| `tests/` | Play-queue test (faked Spotify), export-import test, DJ analysis test, and playlist/set-list test |
+| `tests/` | Play-queue test (faked Spotify), export-import test, DJ analysis test, playlist/set-list test, and melody-detector test |
 
 ---
 
