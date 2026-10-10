@@ -111,7 +111,7 @@ class Deck {
       rate: 1, range: 0.08, nudge: 0, pos: 0, playing: false, source: null, sourceGain: null, startedAt: 0, startPos: 0, scale: 1,
       cue: 0, hot: [null, null, null, null], loop: null,
       keylock: store.get("dj-keylock", true), stretched: null, stretching: false, stretchTimer: 0,
-      eq: { high: 0, mid: 0, low: 0 }, filter: 0, volume: 0.9, overviewCache: null,
+      eq: { high: 0, mid: 0, low: 0 }, filter: 0, volume: 0.9, overviewCache: null, melodyCache: null,
     });
     this.worker = new Worker("djworker.js");
     this.jobs = new Map();
@@ -220,7 +220,7 @@ class Deck {
     if (this.playing) this.fadeOut();
     Object.assign(this, {
       playing: false, loading: true, meta: item, buffer: null, analysis: null, stretched: null, loop: null,
-      pos: 0, cue: 0, rate: 1, nudge: 0, hot: [null, null, null, null], overviewCache: null,
+      pos: 0, cue: 0, rate: 1, nudge: 0, hot: [null, null, null, null], overviewCache: null, melodyCache: null,
     });
     this.render();
     try {
@@ -532,7 +532,92 @@ class Deck {
     });
     g.fillStyle = "#fff";
     g.fillRect(X(p) - dpr, 0, 2 * dpr, H);
+    this.drawMelody();
   }
+
+  // The tune as a line: high notes near the top, gaps where nothing is pitched.
+  drawMelody() {
+    const canvas = $(`#deck-${this.id} [data-f="melody"]`);
+    const dpr = Math.min(2, devicePixelRatio || 1), W = Math.round(canvas.clientWidth * dpr), H = Math.round(canvas.clientHeight * dpr);
+    if (!W) return;
+    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; this.melodyCache = null; }
+    const g = canvas.getContext("2d");
+    g.clearRect(0, 0, W, H);
+    const midi = this.analysis?.melody?.midi;
+    if (!midi?.length) return;
+
+    if (!this.melodyCache) {
+      const off = document.createElement("canvas");
+      off.width = W;
+      off.height = H;
+      drawMelodyLine(off.getContext("2d"), midi, W, H, dpr, this.color);
+      this.melodyCache = off;
+    }
+    g.drawImage(this.melodyCache, 0, 0);
+    const x = (this.position() / this.duration) * W;
+    g.fillStyle = "rgba(0,0,0,0.45)";
+    g.fillRect(0, 0, x, H);                      // what you have played dims, so the shape ahead stands out
+    g.fillStyle = "#fff";
+    g.fillRect(x - dpr, 0, 2 * dpr, H);
+  }
+}
+
+// Scaled to the notes the track actually uses, so a bassline and a topline both fill the strip.
+function drawMelodyLine(g, midi, W, H, dpr, color) {
+  let lo = Infinity, hi = -Infinity;
+  for (const v of midi) if (!Number.isNaN(v)) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (!Number.isFinite(lo) || hi - lo < 1) return;
+  const pad = 3 * dpr;
+  const Y = (v) => H - pad - ((v - lo) / (hi - lo)) * (H - 2 * pad);
+
+  // One column per pixel: the median of the frames landing on it, so the line stays readable when zoomed out.
+  const column = new Float32Array(W).fill(NaN);
+  const per = midi.length / W;
+  const bucket = [];
+  for (let x = 0; x < W; x++) {
+    bucket.length = 0;
+    for (let i = Math.floor(x * per); i < Math.min(midi.length, Math.ceil((x + 1) * per)); i++) {
+      if (!Number.isNaN(midi[i])) bucket.push(midi[i]);
+    }
+    if (bucket.length) {
+      bucket.sort((a, b) => a - b);
+      column[x] = bucket[bucket.length >> 1];
+    }
+  }
+
+  // A soft wash under the line gives the rises and falls some weight.
+  const fill = g.createLinearGradient(0, 0, 0, H);
+  fill.addColorStop(0, `${d3.color(color).copy({ opacity: 0.35 })}`);
+  fill.addColorStop(1, `${d3.color(color).copy({ opacity: 0.02 })}`);
+  let run = [];
+  const flush = () => {
+    if (run.length > 1) {
+      g.beginPath();
+      g.moveTo(run[0][0], H);
+      for (const [x, y] of run) g.lineTo(x, y);
+      g.lineTo(run[run.length - 1][0], H);
+      g.closePath();
+      g.fillStyle = fill;
+      g.fill();
+      g.beginPath();
+      g.moveTo(run[0][0], run[0][1]);
+      for (const [x, y] of run) g.lineTo(x, y);
+      g.strokeStyle = color;
+      g.lineWidth = 1.6 * dpr;
+      g.lineJoin = "round";
+      g.lineCap = "round";
+      g.shadowColor = color;
+      g.shadowBlur = 6 * dpr;
+      g.stroke();
+      g.shadowBlur = 0;
+    }
+    run = [];
+  };
+  for (let x = 0; x < W; x++) {
+    if (Number.isNaN(column[x])) flush();
+    else run.push([x, Y(column[x])]);
+  }
+  flush();
 }
 
 // Colored waveform: amplitude from the peak, color from the balance of low / mid / high energy.
@@ -1030,6 +1115,7 @@ function deckMarkup(id) {
       <span class="key-badge" data-f="key" hidden></span><span data-f="orig"></span><span data-f="history"></span><span class="deck-status" data-f="status"></span>
     </div>
     <canvas class="deck-overview" data-f="overview" title="Click to jump"></canvas>
+    <canvas class="deck-melody" data-f="melody" title="The tune's rises and falls, highest note to lowest"></canvas>
     <div class="deck-time"><span data-f="elapsed">0:00.0</span><span data-f="remaining">-0:00</span></div>
     <div class="deck-transport">
       <button class="pad" data-act="cue" title="Cue: set when paused, return when playing">CUE</button>
