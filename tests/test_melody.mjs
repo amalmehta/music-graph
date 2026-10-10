@@ -94,5 +94,43 @@ for (const note of [45, 57, 69, 81]) {                       // A2, A3, A4, A5
   check("the rate matches the points", Math.abs(midi.length / rate - 10) < 0.6, true);
 }
 
+// --- the live detector in the light show, which works off the analyser's byte waveform ---
+const npSrc = fs.readFileSync(path.join(root, "nowplaying.js"), "utf8");
+function lift(src, name, extra = "") {
+  const at = src.indexOf(`function ${name}(`);
+  if (at < 0) throw new Error(`${name} not found`);
+  let depth = 0, i = src.indexOf("{", at);
+  for (; i < src.length; i++) {
+    if (src[i] === "{") depth++;
+    else if (src[i] === "}" && --depth === 0) break;
+  }
+  return new Function(`${extra}\n${src.slice(at, i + 1)}\nreturn ${name};`)();
+}
+const detectPitch = lift(npSrc, "detectPitch", npSrc.match(/const pitchBuf = .*;/)[0]);
+
+// What an AnalyserNode hands over: 8-bit samples centred on 128.
+function bytes(seconds, hz, sr = 48000, gain = 0.4) {
+  const n = 2048;
+  const out = new Uint8Array(n);
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    phase += hz / sr;
+    if (phase >= 1) phase -= 1;
+    out[i] = Math.max(0, Math.min(255, Math.round(128 + gain * 127 * (2 * phase - 1))));
+  }
+  return out;
+}
+
+for (const note of [45, 57, 69]) {
+  check(`live: MIDI ${note} reads back`, detectPitch(bytes(1, midiToHz(note)), 48000), note, 1.0);
+}
+check("live: silence gives no note", Number.isNaN(detectPitch(new Uint8Array(2048).fill(128), 48000)), true);
+{
+  const noise = new Uint8Array(2048).map(() => 128 + Math.round((Math.random() * 2 - 1) * 50));
+  const got = detectPitch(noise, 48000);
+  check("live: noise gives no note", Number.isNaN(got), true);
+}
+check("live: a quiet signal is ignored", Number.isNaN(detectPitch(bytes(1, 220, 48000, 0.002), 48000)), true);
+
 console.log(ok ? "PASS" : "FAILED");
 process.exit(ok ? 0 : 1);

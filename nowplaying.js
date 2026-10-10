@@ -15,6 +15,9 @@ let match = null; // { track, artist, vibe, mapId, trackSeries, artistSeries }
 let byUri, byKey, artistByKey;
 
 let palette = DEFAULT_PALETTE.map((c) => [...c]), paletteFrom = palette, paletteTo = palette, paletteT = 1;
+const MELODY_TRAIL = 520;        // frames kept on screen: about nine seconds of tune
+const melodyTrail = [];          // MIDI notes, NaN where nothing is pitched
+const melodyView = { lo: 52, hi: 76 };   // the note range on screen, eased towards what is playing
 const audio = { ctx: null, analyser: null, stream: null, freq: null, wave: null, silentSince: 0, label: "" };
 const levels = { bass: 0, mid: 0, high: 0, beat: 0, peaks: [0.2, 0.2, 0.2], prevBass: 0, flux: [], lastBeat: 0, spec: new Float32Array(64), specPeak: 0.3 };
 const particles = [];
@@ -395,6 +398,7 @@ function readLevels(now, dt) {
       peak = Math.max(peak, v);
     }
     levels.specPeak = Math.max(peak, levels.specPeak * 0.997, 0.08);
+    pushPitch(detectPitch(wave, input.ctx.sampleRate));
 
     if (!external) {
       const quiet = raw.every((v) => v < 0.02);
@@ -540,6 +544,125 @@ function burst(n) {
   }
 }
 
+// The strongest pitch right now, by autocorrelation on a decimated copy of the waveform —
+// cheap enough to run every frame. Returns a MIDI note, or NaN when nothing is really pitched.
+const pitchBuf = new Float32Array(512);
+
+function detectPitch(wave, sampleRate) {
+  const step = Math.max(1, Math.floor(wave.length / pitchBuf.length));
+  const sr = sampleRate / step;
+  let energy = 0;
+  for (let i = 0; i < pitchBuf.length; i++) {
+    let s = 0;
+    for (let j = 0; j < step; j++) s += wave[i * step + j] - 128;
+    const v = s / (step * 128);
+    pitchBuf[i] = v;
+    energy += v * v;
+  }
+  if (energy < 0.02) return NaN;                                  // basically silence
+
+  const minLag = Math.max(2, Math.floor(sr / 1100));              // C6
+  const maxLag = Math.min(Math.floor(sr / 65), pitchBuf.length >> 1);   // C2
+  const acf = new Float32Array(maxLag + 2);
+  for (let lag = minLag; lag <= maxLag + 1; lag++) {
+    let sum = 0;
+    for (let i = 0; i < pitchBuf.length - lag; i++) sum += pitchBuf[i] * pitchBuf[i + lag];
+    acf[lag] = sum / (pitchBuf.length - lag);
+  }
+  const zero = energy / pitchBuf.length;
+  let best = 0;
+  for (let lag = minLag; lag <= maxLag; lag++) if (acf[lag] > best) best = acf[lag];
+  if (best / zero < 0.35) return NaN;                             // noisy or percussive: no note
+
+  // The tallest peak is often an octave down, so take the shortest lag that gets close to it.
+  const floorValue = best * 0.85;
+  for (let lag = minLag + 1; lag < maxLag; lag++) {
+    if (acf[lag] >= floorValue && acf[lag] > acf[lag - 1] && acf[lag] >= acf[lag + 1]) {
+      const a = acf[lag - 1], b = acf[lag], c = acf[lag + 1];
+      const shift = (a - c) / (2 * (a - 2 * b + c)) || 0;
+      return 69 + 12 * Math.log2(sr / (lag + shift) / 440);
+    }
+  }
+  return NaN;
+}
+
+function pushPitch(midi) {
+  const last = melodyTrail.length ? melodyTrail[melodyTrail.length - 1] : NaN;
+  // Ease small wobbles, let real leaps through, so the line glides but still jumps when the tune does.
+  const value = Number.isNaN(midi) || Number.isNaN(last) || Math.abs(midi - last) > 2
+    ? midi
+    : last + (midi - last) * 0.35;
+  melodyTrail.push(value);
+  if (melodyTrail.length > MELODY_TRAIL) melodyTrail.shift();
+}
+
+// A line of the melody across the whole backdrop: time runs left to right, pitch runs up.
+function drawMelody(ctx, W, H, now) {
+  const voiced = melodyTrail.filter((v) => !Number.isNaN(v));
+  const band = H * 0.42, midY = H * 0.5;
+  const points = [];
+  if (voiced.length > 8) {
+    // Ease the window towards the notes in view, so the line uses the height without jittering.
+    const lo = Math.min(...voiced), hi = Math.max(...voiced);
+    melodyView.lo += (Math.min(lo, hi - 7) - melodyView.lo) * 0.03;
+    melodyView.hi += (Math.max(hi, lo + 7) - melodyView.hi) * 0.03;
+    const span = Math.max(4, melodyView.hi - melodyView.lo);
+    for (let i = 0; i < melodyTrail.length; i++) {
+      const v = melodyTrail[i];
+      points.push(Number.isNaN(v) ? null : [
+        (i / (MELODY_TRAIL - 1)) * W,
+        midY + band / 2 - ((v - melodyView.lo) / span) * band,
+      ]);
+    }
+  } else {
+    // Nothing pitched yet: a slow breathing wave, so the backdrop never looks broken.
+    for (let i = 0; i < MELODY_TRAIL; i++) {
+      const t = i / (MELODY_TRAIL - 1);
+      points.push([t * W, midY + Math.sin(t * 7 + now * 0.0012) * band * 0.16 * (0.4 + levels.bass)]);
+    }
+  }
+
+  // Three passes: a wide wash, a soft body, a bright core — it reads as light rather than a chart line.
+  for (const pass of [{ w: 22, a: 0.1 }, { w: 7, a: 0.2 }, { w: 2, a: 0.75 }]) {
+    ctx.lineWidth = pass.w * dpr;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    let run = [];
+    const stroke = () => {
+      if (run.length > 1) {
+        const grad = ctx.createLinearGradient(run[0][0], 0, run[run.length - 1][0], 0);
+        grad.addColorStop(0, css(palette[2], 0));
+        grad.addColorStop(0.25, css(palette[2], pass.a * 0.7));
+        grad.addColorStop(1, css(palette[0], pass.a));
+        ctx.strokeStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(run[0][0], run[0][1]);
+        for (let i = 1; i < run.length; i++) {
+          const [px, py] = run[i - 1], [x, y] = run[i];
+          ctx.quadraticCurveTo(px, py, (px + x) / 2, (py + y) / 2);   // round off the corners
+        }
+        ctx.stroke();
+      }
+      run = [];
+    };
+    for (const p of points) p ? run.push(p) : stroke();
+    stroke();
+  }
+
+  // A head on the newest note, so your eye has something to follow.
+  const head = points[points.length - 1];
+  if (head) {
+    const r = (3 + 5 * levels.bass) * dpr;
+    const glow = ctx.createRadialGradient(head[0], head[1], 0, head[0], head[1], r * 5);
+    glow.addColorStop(0, css(palette[0], 0.9));
+    glow.addColorStop(1, css(palette[0], 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(head[0], head[1], r * 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 function drawFx(now, dt) {
   const ctx = fx, W = els.fx.width, H = els.fx.height;
   ctx.globalCompositeOperation = "source-over";
@@ -553,6 +676,7 @@ function drawFx(now, dt) {
     ctx.fillRect(0, 0, W, H);
   }
   ctx.globalCompositeOperation = "lighter";
+  drawMelody(ctx, W, H, now);
 
   const { x: cx, y: cy, radius } = artCenter();
   const R = radius + 14 * dpr, N = levels.spec.length;

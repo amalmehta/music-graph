@@ -65,6 +65,8 @@ For a clean signal with no room noise, install [BlackHole](https://existential.a
 
 Without audio access, the light show still moves, driven by the album colors and song progress.
 
+Once it can hear the music, a line of the melody runs across the backdrop: time left to right, pitch up the screen, with a glowing head on the note playing now. It reads the strongest pitch in each frame, eases small wobbles but lets real leaps through, and breaks where nothing is pitched — so drum passages leave gaps rather than inventing notes. The vertical range follows the notes in view, so a bassline and a topline both fill the height. With no sound it falls back to a slow breathing wave.
+
 ## 4. Save playlists to Spotify
 
 Playing songs on this Mac works without any setup: the server controls the Spotify desktop app. Two features need a Spotify developer app: saving playlists, and showing Now Playing for music on your phone or other devices.
