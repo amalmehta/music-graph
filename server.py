@@ -36,7 +36,7 @@ AUDIO_TYPES = {
 MAX_CRATE = 10_000
 MAX_UPLOAD = 1_000_000_000          # a very large extended history is a few hundred MB
 SAFE_UPLOAD = re.compile(r"^[A-Za-z0-9 ._-]{1,120}\.(zip|json)$")
-STATIC_FILES = re.compile(r"^/([a-z]+\.(js|css|html)|data/(graph_data|history_index)\.json|config\.json)$")
+STATIC_FILES = re.compile(r"^/([a-z]+\.(js|css|html)|favicon\.(svg|ico)|apple-touch-icon\.png|data/(graph_data|history_index)\.json|config\.json)$")
 
 NOW_PLAYING_SCRIPT = f'''
 if application "Spotify" is not running then return "not_running"
