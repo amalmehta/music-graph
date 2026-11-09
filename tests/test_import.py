@@ -1,6 +1,6 @@
 """Test importing an export over HTTP: what the upload refuses, and a real build end to end.
 
-    python3 tests/test_import.py .
+    python3 tests/test_import.py           # or pass a project root as argv[1]
 
 Runs the server against a throwaway copy of the project, so your own data/ is untouched.
 """
@@ -8,7 +8,7 @@ import json, os, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.r
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-SRC = Path(sys.argv[1]).resolve()
+SRC = (Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).parent.parent).resolve()
 ok = True
 
 

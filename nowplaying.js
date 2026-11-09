@@ -176,7 +176,9 @@ function onTrackChange(s) {
     artistSeries: artist ? dense(artist.h, M) : null,
   };
 
-  els.mapLabel.textContent = vibe >= 0 ? api.vibeName(vibe) : "Not on your map yet";
+  // On sample data every real song misses, so say why rather than calling it new.
+  const sample = !!state.graph.meta.sample;
+  els.mapLabel.textContent = vibe >= 0 ? api.vibeName(vibe) : sample ? "Sample map" : "Not on your map yet";
   els.more.hidden = vibe < 0;
   if (track) {
     const peak = match.trackSeries.indexOf(Math.max(...match.trackSeries));
@@ -186,8 +188,10 @@ function onTrackChange(s) {
     els.historyLabel.textContent = "New song, familiar artist";
     els.historyStats.textContent = `First time with this song. You've played ${artist.n} ${fmtInt(artist.p)} times since ${artist.f.slice(0, 4)}.`;
   } else {
-    els.historyLabel.textContent = "New to you";
-    els.historyStats.textContent = "Not in your listening history yet. Its story starts today.";
+    els.historyLabel.textContent = sample ? "Sample history" : "New to you";
+    els.historyStats.textContent = sample
+      ? "This history is made-up sample data, so every real song looks new. Import your export to see your own story with it."
+      : "Not in your listening history yet. Its story starts today.";
   }
   const a = match.mapId >= 0 ? state.graph.artists[match.mapId] : null;
   Object.assign(cam, a ? { tx: a.x, ty: a.y, tk: 2.4 } : { tx: 0.5, ty: 0.5, tk: 1 });

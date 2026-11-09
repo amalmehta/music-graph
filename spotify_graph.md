@@ -491,11 +491,11 @@ data location:
 - raw export lives in `data/raw/` inside this project (folder or `my_spotify_data.zip`; pipeline unzips if needed)
 - `data/raw/` is private input — never published; only aggregated JSON ships with the page
 
-bridges between vibes (2026-09-28):
+bridges between vibes:
 
 - pipeline adds `bridges` (per vibe pair: strength, shared sessions, top linking artist pairs) and `cross` per artist (share of its links reaching other vibes)
 - vibes map draws the top 3 artist links per vibe pair as gradient arcs (hover for the pair + session count, click to select the artist); pairs under 5% strength are hidden
-- artists in the top 8% for cross-vibe links get a dashed ring in the color of the vibe they reach toward
+- artists whose cross share reaches the 92nd percentile get a dashed ring in the color of the vibe they reach toward, and never below a cross share of 0.20 (`app.js`: `max(0.2, quantile(cross, 0.92))`)
 - side panel gains "What links them": each vibe pair with the artists doing the linking and how many sessions had both
 - each bridge also carries *why*: mid-session vibe switches counted by hour and month, the dominant drift direction, and the top "gateway" songs (the track played right after a switch); shown in the panel and the arc tooltip
 - arc thickness scales to the strongest link on screen (raw PMI weights needed normalising)
@@ -506,33 +506,57 @@ bridges between vibes (2026-09-28):
 - third poster style "Aurora": the Now Playing look as a print — SVG feTurbulence + feDisplacementMap color fields behind one ring of daily listening, with the same crossover beads; exports at 3000 × 4242 (~10 MB, filters rasterize fine)
 - poster constellation draws bridges as brighter gradient links (gradients live in the poster's own defs, so PNG/SVG exports keep them); `?poster=rings|constellation` picks the style
 
-final pass (2026-09-26):
+DEFINITIONS:
 
-- vibes map: new dots are drawn at their final size/place (they used to fly in from the corner on first paint)
-- Now Playing: the dark backdrop is solid immediately, only the contents fade in
-- screenshots/ recaptured from the finished build (7 views + live Now Playing)
+Every number here is read off the code, with the constant or file named. Change the
+code and change this list in the same commit.
 
-performance + verification (2026-09-20):
+- a play — `ms_played >= 30_000` (`MIN_MS`, Spotify's own stream threshold). Podcast/audiobook rows and rows with no artist are dropped. Skips are counted from all attempts; everything else counts plays of 30s+.
+- a session — plays separated by 30 minutes or less (`SESSION_GAP`); a longer pause starts a new one. A session with more than 50 distinct artists (`MAX_SESSION_ARTISTS`) contributes no co-listening pairs, so all-day shuffles don't tie everything to everything.
+- a mapped artist — the top 300 by minutes (`TOP_ARTISTS`) among artists with at least 3 plays. Everyone else is in the stats but not on the map.
+- co-listening strength — PMI across sessions, `log(n · N / (nᵢ · nⱼ))`, kept only when positive, then scaled by `log1p(n)` so a strong link needs both surprise and volume. Published weights are divided by the strongest edge, so they read 0–1.
+- a vibe — a Louvain community (`seed=42`) on that PMI graph. Resolution escalates 1.0 → 1.3 → 1.7 → 2.2 until the graph stops collapsing into two blobs. At most 10 (`MAX_VIBES`).
+- a vibe's name — the time bucket with the highest lift that also holds at least 12% of the vibe's listening hours (late night 0–5, early morning 5–9, morning 9–12, afternoon 12–17, evening 17–21, night 21–24), plus "weekends" when weekend lift > 1.25, "weekdays" when < 0.8, else "any day".
+- the network's edges — each node keeps its 6 strongest links (`EDGES_PER_NODE`), then bridges are added back (see above).
+- a bridge — a vibe pair whose strength is at least 0.05 of the strongest pair. Below that it is hidden and not restored after pruning.
+- a recommendation's score — `log1p(plays) × (0.3 + 0.7 × completion) × (0.08 + fit) × (0.85 + 0.3 × random)`, multiplied by 0.15 if the track was already shown. `fit` comes from the rediscover ↔ comfort slider. At most 2 songs per artist, or 3 when the vibe has fewer than 8 artists.
+- a track's tempo — folded into `78 ≤ BPM < 160` (`djworker.js`).
+- "buttery smooth" — every interaction answers within 100 ms, motion holds the display's frame rate, transitions run 150–250 ms, and no work blocks the main thread.
 
-- tested against a heavy-listener-sized library (320 artists, 87k plays, 8 years) generated with `make_sample_data.py --artists 320 --density 2.2`
-- network view first render 1.3s → ~0.3s: layout now precomputed in `build_data.py` (`nx`/`ny` per artist), browser physics only while dragging; nodes shrink in big libraries so links stay visible
-- vibes map: density grid coarsened (0.32s → 0.03s), collide relaxation halved, label nodes capped at 90
-- pipeline cost: ~60–75s for 87k plays (two spring layouts); small sample ~6s
-- `tests/test_queue.py`: play queue verified against a faked Spotify (start, advance on song end, advance when Spotify auto-plays, step aside on manual change)
-- `tests/test_djworker.mjs`: tempo 3/3, beat grid within 5ms, key 2/3 (ambiguous track reads as a neighbouring key), stretch round-trip holds tempo + key
-- DJ audio measured by tapping the deck output (master muted): loop wraps and key-lock swaps produce no sample jumps beyond the track's own transients, and no dropouts — still not judged by ear
-- poster exports now embed the font (SVG 672 KB, PNG 3000 × 4242); verified the embedded face actually changes rasterized output
+done criteria (proposed — confirm before they bind):
 
-build status (2026-09-16):
+- a view is done when it renders from `graph_data.json` alone, follows the header date range, reads correctly in light and dark, and holds its layout at 375 px wide.
+- the pipeline is done when it runs on a real export with no code changes, and `meta.sample` is `false`.
+- a DJ feature is done when `tests/test_djworker.mjs` covers it and it has been run once against a real music file.
 
-- DJ tab built and tested on synthetic tracks: BPM 3/3 correct, key 2/3 (ambiguous A minor track read as G major, a neighbouring key); sync holds beat phase exactly; loops, crossfader, key lock and WAV recording verified; full-screen DJ light show verified
-- DJ not yet tried on real music files (the ~/Music folder has no songs)
-- Habits + Poster built and verified on sample data; poster exports checked (PNG 3000 × 4242, SVG); phase 2 is now complete
+DEFERRED (not being built now):
 
-- phase 1 built and running on sample data; Now Playing verified live against the Spotify desktop app
-- not yet exercised: Play / queue through the desktop app (skipped to avoid interrupting music), Save to Spotify (needs Client ID), mic / BlackHole sync (needs browser permission)
+- the real export — `data/raw/` is empty and `meta.sample` is `true`, so every view, recommendation and Now Playing match is generated data. Requested? It takes up to 30 days to arrive.
+- the private share link for history views — locked in decisions on 2026-09-16, never built; nothing in the code publishes anything.
+- Save to Spotify and the Web API now-playing fallback — need a Client ID and Premium on the owner's account; never exercised.
+- mic / BlackHole light-show sync — needs a browser permission that has not been granted in a test.
+- the DJ against a real library — `~/Music` holds 1 audio file; every deck result so far is from synthetic tracks with known BPM and key.
+- Play / queue through the desktop app — skipped so as not to interrupt music.
+- `docs/SYSTEM-DESIGN.md` and `docs/PROMPTS.md` — required by the meta-instructions, not written; there is no `docs/` directory.
+- a feedback tab and a single settings panel (⌘,) — required by the meta-instructions for applications; preferences are currently spread across the theme toggle, the setup dialog and per-tab state.
 
 open items:
 
 - export requested? → copy it into `data/raw/` when it arrives, then run `build_data.py` (no `--sample`)
 - Spotify developer app Client ID for saving playlists + Web API fallback (developer.spotify.com → create app → redirect URI `http://127.0.0.1:8765/callback` → paste Client ID into `config.json`). Needs Premium on the app owner's account. Not a blocker for building or local play
+
+changelog:
+
+Newest first. Dates are the day the work landed.
+
+- 2026-11-09 — spec: meta-instructions expanded into the standing build rules; shared shortcuts added (`Shortcuts.md`, `CLAUDE.md`). The four dated status sections were collapsed into this changelog and the stale claims in them corrected; DEFINITIONS and DEFERRED written. `tests/test_queue.py` and `tests/test_import.py` now find the project root themselves instead of failing without `argv[1]`. Now Playing says why a song is unknown while the history is sample data, instead of calling every real song new.
+- 2026-10-17 — an app icon: `favicon.svg`, `favicon.ico`, `apple-touch-icon.png`.
+- 2026-10-09 — melody and registers. `djworker.js` detects pitch per track as MIDI notes with gaps where nothing is pitched; each deck draws that melody under its waveform; Now Playing runs a live melody trail across the backdrop, time left to right and pitch up, with the note window easing to whatever is playing. Covered by `tests/test_melody.mjs` (steady notes, a rising glide, an octave leap, silence, noise, and the live path).
+- 2026-10-04 — Spotify playlists become a DJ crate source, so a playlist's tracks can be matched against files you own and mixed. README shows the setup panel; paths shortened in messages; the import counter stays honest in a background tab. (PR #1.)
+- 2026-10-02 — import an export from the app itself, no terminal, and record what the graph was built from. Covered by `tests/test_import.py`.
+- 2026-10-01 — the Poster tab is shown, not just its output.
+- 2026-09-28 — bridges between vibes; see the section above for how they are computed and drawn. Aurora poster style and crossover beads landed with it.
+- 2026-09-26 — final pass: vibes-map dots are drawn at their final size and place instead of flying in; the Now Playing backdrop is solid immediately and only its contents fade; `screenshots/` recaptured from the finished build.
+- 2026-09-20 — performance and verification against a heavy-listener library (320 artists, 87k plays, 8 years, from `make_sample_data.py --artists 320 --density 2.2`). Network first render 1.3s → ~0.3s by precomputing the layout in `build_data.py` (`nx`/`ny` per artist), leaving browser physics for dragging only; nodes shrink in big libraries so links stay visible. Vibes map density grid coarsened (0.32s → 0.03s), collide relaxation halved, label nodes capped at 90. Pipeline costs ~60–75s for 87k plays, ~6s for the small sample. `tests/test_queue.py` verified the play queue against a faked Spotify. `tests/test_djworker.mjs`: tempo 3/3, beat grid within 5 ms, key 2/3 (an ambiguous track reads as a neighbouring key), stretch round-trip holds tempo and key. DJ audio measured by tapping the deck output with the master muted: no sample jumps beyond the track's own transients and no dropouts — still not judged by ear. Poster exports embed the font (SVG 672 KB, PNG 3000 × 4242), and the embedded face was confirmed to change rasterized output.
+- 2026-09-18 — Habits and Poster built and verified on sample data; poster exports checked (PNG 3000 × 4242, SVG). Phase 2 complete.
+- 2026-09-16 — phase 1 built and running on sample data; Now Playing verified live against the Spotify desktop app. DJ tab built and tested on synthetic tracks: BPM 3/3, key 2/3 (an ambiguous A minor track read as G major, a neighbouring key); sync holds beat phase exactly; loops, crossfader, key lock and WAV recording verified, as was the full-screen DJ light show.

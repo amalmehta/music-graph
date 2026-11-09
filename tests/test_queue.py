@@ -1,9 +1,10 @@
 """Simulated test of the server-side play queue. Spotify is faked, so nothing plays.
 
-    python3 tests/test_queue.py .
+    python3 tests/test_queue.py            # or pass a project root as argv[1]
 """
 import re, sys, time
-sys.path.insert(0, sys.argv[1])
+from pathlib import Path
+sys.path.insert(0, sys.argv[1] if len(sys.argv) > 1 else str(Path(__file__).resolve().parent.parent))
 import server as S
 
 URIS = ["spotify:track:" + c * 22 for c in "ABC"]
