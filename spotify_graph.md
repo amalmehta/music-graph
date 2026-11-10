@@ -210,6 +210,9 @@ META-INSTRUCTIONS:
  through it as each of them: the first open, the main task, and when something
  goes wrong. Build for what they'd need and notice.>
 
+<Each piece of software needs to connect deeply with the way a human being
+ naturally interacts with the world.>
+
 <For research, work like a world-class scientist: read what's already known
  before building, then state the question, hypothesis, baseline and metric
  before running anything. Change one thing at a time with controls and
