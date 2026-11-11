@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Runs every suite. No arguments, no setup: regenerates the DJ test audio if it
+# has gone missing, then reports one line per suite and fails loudly.
+set -uo pipefail
+cd "$(dirname "$0")"
+
+PY=".venv/bin/python"
+[ -x "$PY" ] || PY="python3"
+
+# test_djworker needs tracks with known BPM and key; they are generated, not stored.
+if [ ! -d data/test_audio ] || [ -z "$(ls -A data/test_audio 2>/dev/null)" ]; then
+  echo "· generating data/test_audio (not kept in the repo)"
+  "$PY" make_test_audio.py >/dev/null || { echo "  could not generate test audio"; exit 1; }
+fi
+
+pass=0 fail=0 failed=()
+run() {
+  local name="$1"; shift
+  local out
+  if out=$("$@" 2>&1) && printf '%s' "$out" | tail -1 | grep -q '^PASS$'; then
+    echo "  ok    $name"
+    pass=$((pass + 1))
+  else
+    echo "  FAIL  $name"
+    printf '%s\n' "$out" | sed 's/^/        /' | tail -20
+    fail=$((fail + 1)); failed+=("$name")
+  fi
+}
+
+echo "Running tests"
+for t in tests/*.mjs; do run "$(basename "$t")" node "$t"; done
+for t in tests/*.py;  do run "$(basename "$t")" "$PY" "$t"; done
+
+echo
+if [ "$fail" -eq 0 ]; then
+  echo "All $pass suites passed."
+else
+  echo "$fail of $((pass + fail)) failed: ${failed[*]}"
+  exit 1
+fi

@@ -1,6 +1,6 @@
 // Main page: data loading, header + date brush, and the Vibes / Network / Over time views.
 
-import { bus, vibeColor, fmtHours, fmtInt, fmtMonth, fmtDate, escapeHtml, store, toast } from "./util.js";
+import { bus, vibeColor, fmtHours, fmtInt, fmtMonth, fmtDate, fmtAgo, daysBetween, escapeHtml, store, toast } from "./util.js";
 import * as Spotify from "./spotify.js";
 import * as Recs from "./recs.js";
 import * as NowPlaying from "./nowplaying.js";
@@ -149,15 +149,24 @@ function setupTheme() {
 }
 
 function setupTabs() {
-  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
+  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view, true)));
+  // Back and Forward move between tabs instead of leaving the app.
+  addEventListener("hashchange", () => {
+    const name = location.hash.slice(1) || "vibes";
+    if (views[name] && name !== state.view) showView(name);
+  });
 }
 
 const views = {};
-function showView(name) {
+function showView(name, push = false) {
   state.view = name;
   document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === name)));
   document.querySelectorAll(".view").forEach((s) => (s.hidden = s.id !== `view-${name}`));
-  if (location.hash.slice(1) !== name) history.replaceState(null, "", name === "vibes" ? location.pathname + location.search : `#${name}`);
+  if (location.hash.slice(1) !== name) {
+    const url = name === "vibes" ? location.pathname + location.search : `#${name}`;
+    if (push) history.pushState(null, "", url);
+    else history.replaceState(null, "", url);
+  }
   hideTip();
   views[name]?.show();
 }
@@ -338,6 +347,33 @@ function selectArtist(id) {
   if (id == null) panelOverview();
   else panelArtist(id);
   bus.emit("selection");
+}
+
+// The maps were mouse-only: scroll to zoom, hover, click. Arrow keys now walk the
+// artists a vibe at a time, so the views can be explored from the keyboard too.
+function wireMapKeys(el, label) {
+  if (!el) return;
+  el.setAttribute("tabindex", "0");
+  el.setAttribute("role", "application");
+  el.setAttribute("aria-label", `${label}. Arrow keys move between artists, Enter opens one, Escape clears.`);
+  el.addEventListener("keydown", (e) => {
+    const ids = state.graph.artists
+      .filter((a) => artistMinutes(a) > 0)
+      .sort((a, b) => a.vibe - b.vibe || artistMinutes(b) - artistMinutes(a))
+      .map((a) => a.id);
+    if (!ids.length) return;
+    const cur = state.selected?.type === "artist" ? ids.indexOf(state.selected.id) : -1;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      selectArtist(ids[cur < 0 ? 0 : (cur + 1) % ids.length]);
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      selectArtist(ids[cur < 0 ? ids.length - 1 : (cur - 1 + ids.length) % ids.length]);
+    } else if (e.key === "Escape" && cur >= 0) {
+      e.preventDefault();
+      selectArtist(null);
+    }
+  });
 }
 
 function selectVibe(v) {
@@ -709,7 +745,7 @@ views.network = (() => {
   }
 
   // "Bridges only": fade everything that stays inside one vibe
-  let bridgesOnly = new URLSearchParams(location.search).get("bridges") === "1";
+  let bridgesOnly = false;
   function showBridgesOnly() {
     const linked = new Set();
     g.selectAll(".bridge-links line").each((l) => { linked.add(l.source.id); linked.add(l.target.id); });
@@ -867,7 +903,9 @@ async function main() {
   }
   try {
     [state.graph, state.history] = await Promise.all([loadJSON("data/graph_data.json"), loadJSON("data/history_index.json")]);
+    delete document.body.dataset.loading;
   } catch {
+    delete document.body.dataset.loading;
     document.querySelector("main").innerHTML = `<div class="viz-card empty-first"><h2>Nothing here yet</h2>
       <p>Import the listening history Spotify sent you and this fills up with your own music.</p>
       <button class="primary-btn" id="empty-import">Import your export</button>
@@ -881,12 +919,27 @@ async function main() {
     (state.neighbors.get(t) ?? state.neighbors.set(t, []).get(t)).push({ id: s, w, n });
   }
   state.neighbors.forEach((list) => list.sort((a, b) => b.w - a.w));
-  $("#sample-badge").hidden = !state.graph.meta.sample;
-  $("#sample-badge").addEventListener("click", () => Setup.open());
+  // How old the data is belongs in the header, not one click into the setup dialog.
+  const badge = $("#sample-badge");
+  const age = daysBetween(state.graph.meta.generated, Date.now());
+  if (state.graph.meta.sample) {
+    badge.hidden = false;
+    badge.textContent = age > 0 ? `sample data · ${fmtAgo(age)}` : "sample data";
+    badge.title = "Made-up listening. Click to import your own export.";
+  } else if (age >= 30) {
+    badge.hidden = false;
+    badge.textContent = `built ${fmtAgo(age)}`;
+    badge.title = "Spotify has newer listening than this. Click to import a fresh export.";
+  } else {
+    badge.hidden = true;
+  }
+  badge.addEventListener("click", () => Setup.open());
   Setup.init(state.graph.meta);
 
   setupTabs();
   setupBrush();
+  wireMapKeys($("#vibes-svg"), "Taste map");
+  wireMapKeys($("#network-svg"), "Artist network");
   views.network.fillSearch();
   panelOverview();
   Recs.init(api);

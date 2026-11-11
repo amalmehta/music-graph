@@ -1,5 +1,4 @@
-// Web Worker for the DJ decks: tempo, beat grid, key and waveform analysis, plus
-// pitch-preserving time-stretch (WSOLA) so beat-matched tracks keep their key.
+// Web Worker for the DJ decks: tempo, beat grid, key and waveform analysis.
 
 self.onmessage = (e) => {
   const { type, id } = e.data;
@@ -8,9 +7,6 @@ self.onmessage = (e) => {
       const result = analyze(e.data.mono, e.data.sampleRate);
       const transfer = Object.values(result.overview).concat(Object.values(result.detail)).map((a) => a.buffer);
       self.postMessage({ id, ok: true, result }, transfer);
-    } else if (type === "stretch") {
-      const channels = stretch(e.data.channels, e.data.ratio);
-      self.postMessage({ id, ok: true, result: { channels } }, channels.map((c) => c.buffer));
     }
   } catch (err) {
     self.postMessage({ id, ok: false, error: String(err?.message || err) });
@@ -302,55 +298,3 @@ function fft(re, im) {
   }
 }
 
-// ---------- time-stretch ----------
-
-// WSOLA: overlap-add windowed frames, each taken from near its ideal input position at the
-// offset that best continues the previous frame. ratio > 1 plays faster (shorter output).
-function stretch(channels, ratio) {
-  const N = 2048, Hs = N / 2, search = 512, step = 8, stride = 16;
-  const n = channels[0].length;
-  const outLen = Math.floor(n / ratio);
-  const mono = new Float32Array(n);
-  for (const c of channels) for (let i = 0; i < n; i++) mono[i] += c[i] / channels.length;
-  const win = new Float32Array(N).map((_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / N));
-  const outs = channels.map(() => new Float32Array(outLen + N));
-  const weight = new Float32Array(outLen + N);
-
-  const corr = (a, b, s) => {
-    let sum = 0;
-    for (let i = 0; i < N; i += s) sum += mono[a + i] * mono[b + i];
-    return sum;
-  };
-
-  let prev = -1;
-  for (let outPos = 0; outPos < outLen; outPos += Hs) {
-    const target = Math.min(n - N - 1, Math.round(outPos * ratio));
-    if (target < 0) break;
-    let best = target;
-    const natural = prev + Hs;
-    if (prev >= 0 && natural + N < n) {
-      const lo = Math.max(0, target - search), hi = Math.min(n - N - 1, target + search);
-      let bestScore = -Infinity;
-      for (let cand = lo; cand <= hi; cand += step) {
-        const s = corr(natural, cand, stride);
-        if (s > bestScore) { bestScore = s; best = cand; }
-      }
-      const center = best;
-      for (let cand = Math.max(lo, center - step + 1); cand <= Math.min(hi, center + step - 1); cand++) {
-        const s = corr(natural, cand, 4);
-        if (s > bestScore) { bestScore = s; best = cand; }
-      }
-    }
-    for (let c = 0; c < channels.length; c++) {
-      const src = channels[c], dst = outs[c];
-      for (let i = 0; i < N; i++) dst[outPos + i] += src[best + i] * win[i];
-    }
-    for (let i = 0; i < N; i++) weight[outPos + i] += win[i];
-    prev = best;
-  }
-  return outs.map((o) => {
-    const out = new Float32Array(outLen);
-    for (let i = 0; i < outLen; i++) out[i] = weight[i] > 1e-3 ? o[i] / weight[i] : 0;
-    return out;
-  });
-}

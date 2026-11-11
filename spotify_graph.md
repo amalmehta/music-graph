@@ -98,8 +98,9 @@ META-INSTRUCTIONS:
  to scan. Either way, setup and the rest go in linked files:
  docs/INSTRUCTIONS.md (setup, run, use),
  docs/SYSTEM-DESIGN.md (see below) and docs/FILE-STRUCTURE.md (what's where). If what you're
- building is an application rather than a script, also a small unobtrusive feedback tab, and a settings
- button or tab (⌘, on the Mac) that gathers its preferences in one place.>
+ building is an application rather than a script, also a settings button or tab (⌘, on the
+ Mac) that gathers its preferences in one place. A feedback tab only earns its place when
+ the app has users other than me.>
 
 <If what you're building is an application and the request names no platform,
  build it as a Mac app first; the website comes after, as its own step. If it
@@ -380,7 +381,7 @@ decisions (locked 2026-09-16):
 
 - data source: Extended Streaming History export (Streaming_History_Audio_*.json), copied into `data/raw/`
 - until the export arrives: build and test on generated sample data in the exact export format (`data/sample/`); real files drop in with no code changes
-- deliverable: interactive web page (D3 + canvas/WebGL), served locally; history views can be published as a private share link
+- deliverable: interactive web page (D3 + canvas/WebGL), served locally and not published anywhere (a share link was in scope until 2026-11-11; nothing was ever built and it is now out of scope)
 - scope: polished MVP — 3 headline views + live Now Playing mode + mood recommendations now, 2 more views in phase 2
 - artist links: co-listening (artists played in the same sessions), no genre lookups
 - "vibes map" = taste clusters map (see view 1)
@@ -462,8 +463,8 @@ phase 1 views:
 6. DJ (two-deck mixer)
    - crate: audio files under `music_dir` (config.json, default ~/Music; `--music-dir` overrides) via `GET /api/crate` + `GET /api/crate/file?id=` (files addressed by opaque id only), plus drag & drop / "Add files"; rows matched to my Spotify history show plays + vibe color
    - analysis in a Web Worker (`djworker.js`): BPM (onset autocorrelation + comb-filter refine, folded to 78–160), first beat / beat grid, key (Krumhansl–Schmuckler chroma → Camelot), colored overview + scrolling waveforms
-   - decks: play / cue / sync (tempo + beat phase, re-aligned on play) / key lock (WSOLA time-stretch rendered in the worker, swapped in seamlessly), 4 hot cues, 1–16 beat loops, tempo ±8/16%, nudge, ÷2 ×2 BPM fix, 3-band EQ with kill, low/high-pass filter, channel fader + meter
-   - mixer: equal-power crossfader, master volume, WAV recording of the master via AudioWorklet (90 min cap)
+   - decks: play / cue / sync (tempo + beat phase, re-aligned on play), ÷2 ×2 BPM fix, channel fader + meter
+   - mixer: equal-power crossfader, master volume
    - full-screen DJ mode reuses the Now Playing light show, fed by the mix's analyser: spinning disc in deck colors, dual scrolling waveforms, play/sync/crossfader on screen
    - keyboard: A / L play, S / K sync, ← → crossfader
    - `?deckA=` / `?deckB=` load crate tracks by id or name match on open; `&sync=B` beat-matches, `&play=1&lightshow=1` starts the decks in full-screen light show (a "set link")
@@ -535,13 +536,12 @@ done criteria (proposed — confirm before they bind):
 DEFERRED (not being built now):
 
 - the real export — `data/raw/` is empty and `meta.sample` is `true`, so every view, recommendation and Now Playing match is generated data. Requested? It takes up to 30 days to arrive.
-- the private share link for history views — locked in decisions on 2026-09-16, never built; nothing in the code publishes anything.
 - Save to Spotify and the Web API now-playing fallback — need a Client ID and Premium on the owner's account; never exercised.
 - mic / BlackHole light-show sync — needs a browser permission that has not been granted in a test.
-- the DJ against a real library — `~/Music` holds 1 audio file; every deck result so far is from synthetic tracks with known BPM and key.
+- the DJ against a real library — `~/Music` holds 1 audio file. That one file now loads, analyses (136.8 BPM, A♭ minor) and plays, but a real set has never been mixed.
 - Play / queue through the desktop app — skipped so as not to interrupt music.
-- `docs/SYSTEM-DESIGN.md` and `docs/PROMPTS.md` — required by the meta-instructions, not written; there is no `docs/` directory.
-- a feedback tab and a single settings panel (⌘,) — required by the meta-instructions for applications; preferences are currently spread across the theme toggle, the setup dialog and per-tab state.
+- `docs/PROMPTS.md` — required by the meta-instructions, not written.
+- a single settings panel (⌘,) — preferences are still spread across the theme toggle, the setup dialog and per-tab state. The feedback tab was dropped from the rules above.
 
 open items:
 
@@ -551,6 +551,40 @@ open items:
 changelog:
 
 Newest first. Dates are the day the work landed.
+
+- 2026-11-11 — a cut-and-tidy pass (10 cuts, 2 adds, 10 improvements).
+  **Cut:** the DJ's pro depth — hot cues, 1–16 beat loops, key lock and its WSOLA
+  time-stretch, WAV recording, the 3-band EQ, the low/high-pass filter and the
+  ±8/16% tempo fader with nudge. Two decks, cue, play, sync, ÷2 ×2, channel fader
+  and the crossfader remain, which is what a crate of one file can use. `dj.js`
+  1333 → 971 lines, `djworker.js` 356 → 300. Also cut: three `/api/queue`
+  endpoints no client ever called (the queue advances itself on a daemon thread)
+  and the now-orphaned `Player.next()`; the dead `plural` helper's needless
+  twin `export` on `VIBE_COLORS`; `?setup=1` and `?bridges=1`, which duplicated
+  visible controls; a `?theme=` row in the guide for a parameter no code ever
+  read; 104 MB of regenerable fixtures (`data/sample_big`, `data/test_audio`);
+  four screenshots nothing referenced; the private share link, now out of scope
+  rather than deferred forever; and the meta-instruction demanding a feedback
+  tab, which a one-person local app has nobody to send to.
+  **Added:** `docs/SYSTEM-DESIGN.md` (architecture, the reasoning behind PMI,
+  Louvain and the pruning, where data lives, a threat model, limits), and `./test`
+  plus a GitHub Actions workflow — one command, all five suites, regenerating the
+  DJ test audio when it is missing. CI runs on macOS because the analysis test
+  decodes with `afconvert`.
+  **Improved:** a skeleton while the 436 KB of JSON loads, instead of an empty
+  card; arrow-key navigation across both maps, which were mouse-only; the header
+  badge now carries the data's age ("sample data · 44 days ago") rather than
+  hiding it in the setup dialog; Back and Forward move between tabs instead of
+  leaving the app; the album-art cache evicts its oldest entry rather than
+  dumping all 30; `requirements.txt` pinned to the versions actually in use;
+  `plural` wired up so the crate says "1 audio file"; the pure drawing helpers
+  split out to `djdraw.js`.
+  **Corrected:** the guide and README described key lock, loops, hot cues, EQ,
+  filters and recording as if they existed. The DJ screenshot showed them too,
+  and was recaptured — accurately, but at 800px rather than the original 1424px,
+  so it is worth retaking at full size.
+  **First run against real music:** the one file in `~/Music` loads, analyses at
+  136.8 BPM / A♭ minor, and plays. Sound itself was never judged by ear.
 
 - 2026-11-09 — spec: meta-instructions expanded into the standing build rules; shared shortcuts added (`Shortcuts.md`, `CLAUDE.md`). The four dated status sections were collapsed into this changelog and the stale claims in them corrected; DEFINITIONS and DEFERRED written. `tests/test_queue.py` and `tests/test_import.py` now find the project root themselves instead of failing without `argv[1]`. Now Playing says why a song is unknown while the history is sample data, instead of calling every real song new.
 - 2026-10-17 — an app icon: `favicon.svg`, `favicon.ico`, `apple-touch-icon.png`.

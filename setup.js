@@ -42,7 +42,6 @@ export function init(graphMeta) {
   $("#spotify-save").addEventListener("click", saveClientId);
   fetch("/config.json").then((r) => r.json()).then((c) => { $("#spotify-client-id").value = c.client_id || ""; }).catch(() => {});
   describe();
-  if (new URLSearchParams(location.search).get("setup") === "1") open();
   // An import may still be running from a page the user already closed.
   fetch("/api/import").then((r) => r.json()).then((s) => s.state === "building" && (open(), watch())).catch(() => {});
 }

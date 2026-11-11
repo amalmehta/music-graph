@@ -1,0 +1,27 @@
+name: tests
+
+# The DJ analysis test decodes audio with afconvert, which is macOS only, so the
+# whole suite runs on macOS rather than splitting it across two runners.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Python dependencies
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet --upgrade pip
+          .venv/bin/pip install --quiet -r requirements.txt
+      - name: Run every suite
+        run: ./test
