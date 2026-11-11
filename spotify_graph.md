@@ -541,6 +541,7 @@ DEFERRED (not being built now):
 - the DJ against a real library — `~/Music` holds 1 audio file. That one file now loads, analyses (136.8 BPM, A♭ minor) and plays, but a real set has never been mixed.
 - Play / queue through the desktop app — skipped so as not to interrupt music.
 - `docs/PROMPTS.md` — required by the meta-instructions, not written.
+- recapturing `screenshots/` — every shot still shows the pre-2026-11-11 sample numbers (2,024 h, 32,310 plays), so the headline stats in the README no longer match what the app renders. `13-dj-synced.png` is current but was retaken at 800px against the others' 1424px.
 - a single settings panel (⌘,) — preferences are still spread across the theme toggle, the setup dialog and per-tab state. The feedback tab was dropped from the rules above.
 
 open items:
@@ -585,6 +586,15 @@ Newest first. Dates are the day the work landed.
   so it is worth retaking at full size.
   **First run against real music:** the one file in `~/Music` loads, analyses at
   136.8 BPM / A♭ minor, and plays. Sound itself was never judged by ear.
+  **The sample data changed.** CI failed because `test_import.py` zips
+  `data/sample`, which is generated rather than stored, so a fresh checkout had
+  none; `./test` now generates it alongside `data/test_audio`. Verifying that
+  replaced the old `data/sample`, which had been made with different arguments
+  and is gone. The demo numbers moved with it: 2,024 h → 2,433 h, 32,310 →
+  39,261 plays, 64 → 60 artists, 254 → 232 edges; 4 vibes and the 2019-01-01 →
+  2026-09-12 span are unchanged. The new baseline is exactly what
+  `make_sample_data.py` produces with its defaults — seeded, so identical on
+  every machine and in CI, which the old one never was.
 
 - 2026-11-09 — spec: meta-instructions expanded into the standing build rules; shared shortcuts added (`Shortcuts.md`, `CLAUDE.md`). The four dated status sections were collapsed into this changelog and the stale claims in them corrected; DEFINITIONS and DEFERRED written. `tests/test_queue.py` and `tests/test_import.py` now find the project root themselves instead of failing without `argv[1]`. Now Playing says why a song is unknown while the history is sample data, instead of calling every real song new.
 - 2026-10-17 — an app icon: `favicon.svg`, `favicon.ico`, `apple-touch-icon.png`.
