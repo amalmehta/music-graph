@@ -7,7 +7,14 @@ cd "$(dirname "$0")"
 PY=".venv/bin/python"
 [ -x "$PY" ] || PY="python3"
 
-# test_djworker needs tracks with known BPM and key; they are generated, not stored.
+# Both fixtures are generated, not stored, so a fresh checkout has neither.
+# make_sample_data.py is seeded, so this is the same data everywhere.
+if [ ! -d data/sample ] || [ -z "$(ls -A data/sample 2>/dev/null)" ]; then
+  echo "· generating data/sample (not kept in the repo)"
+  "$PY" make_sample_data.py >/dev/null || { echo "  could not generate sample data"; exit 1; }
+fi
+
+# test_djworker needs tracks with known BPM and key.
 if [ ! -d data/test_audio ] || [ -z "$(ls -A data/test_audio 2>/dev/null)" ]; then
   echo "· generating data/test_audio (not kept in the repo)"
   "$PY" make_test_audio.py >/dev/null || { echo "  could not generate test audio"; exit 1; }
