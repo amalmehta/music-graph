@@ -542,7 +542,6 @@ DEFERRED (not being built now):
 - the DJ against a real library — `~/Music` holds 1 audio file. That one file now loads, analyses (136.8 BPM, A♭ minor) and plays, but a real set has never been mixed.
 - Play / queue through the desktop app — skipped so as not to interrupt music.
 - `docs/PROMPTS.md` — required by the meta-instructions, not written.
-- recapturing `screenshots/` — every shot still shows the pre-2026-11-11 sample numbers (2,024 h, 32,310 plays), so the headline stats in the README no longer match what the app renders. `13-dj-synced.png` is current but was retaken at 800px against the others' 1424px.
 - a single settings panel (⌘,) — preferences are still spread across the theme toggle, the setup dialog and per-tab state. The feedback tab was dropped from the rules above.
 
 open items:
@@ -596,6 +595,17 @@ Newest first. Dates are the day the work landed.
   2026-09-12 span are unchanged. The new baseline is exactly what
   `make_sample_data.py` produces with its defaults — seeded, so identical on
   every machine and in CI, which the old one never was.
+  **The screenshots were recaptured** against that new baseline — 13 of the 14,
+  by `make_screenshots.mjs`, which drives headless Chrome over the DevTools
+  protocol so the set can be reproduced rather than re-staged by hand. Sizes are
+  consistent again: 1424 px wide for everything wearing the app's chrome, where
+  `13-dj-synced.png` had been retaken at 800. Two were wrong in ways the stale
+  numbers hid. `7-poster.png` showed Aurora on light paper while the README's
+  table called it Year rings, so no shot anywhere showed that style; it does
+  now. `now-playing.png` was stale in words rather than numbers — it still read
+  "Not on your map yet" and "Its story starts today", the copy corrected on
+  2026-11-09, and now reads "Sample map" and says the history is made up.
+  `14-dj-lightshow.png` carries no stats and was left alone.
 
 - 2026-11-09 — spec: meta-instructions expanded into the standing build rules; shared shortcuts added (`Shortcuts.md`, `CLAUDE.md`). The four dated status sections were collapsed into this changelog and the stale claims in them corrected; DEFINITIONS and DEFERRED written. `tests/test_queue.py` and `tests/test_import.py` now find the project root themselves instead of failing without `argv[1]`. Now Playing says why a song is unknown while the history is sample data, instead of calling every real song new.
 - 2026-10-17 — an app icon: `favicon.svg`, `favicon.ico`, `apple-touch-icon.png`.
