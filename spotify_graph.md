@@ -487,6 +487,7 @@ deliverables (show at end of build):
 - `data/graph_data.json`, `data/history_index.json` (generated — from sample data until my export arrives)
 - `index.html`, `app.js`, `nowplaying.js`, `recs.js`, `spotify.js`, `dj.js`, `djworker.js`, `habits.js`, `poster.js`, `util.js`, `styles.css`, `config.example.json`
 - `make_test_audio.py` (synthetic tracks with known BPM/key for testing the decks)
+- `make_screenshots.mjs` (recaptures `screenshots/` from a running server, via headless Chrome)
 - `README.md`: requesting the export, re-running with a new export, how each view and the recommendations are computed, run command, BlackHole setup for clean audio, creating the Spotify developer app
 - `screenshots/`: the 3 views, For you, and Now Playing mode with a real song, plus the local run command
 
