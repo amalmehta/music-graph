@@ -605,7 +605,13 @@ Newest first. Dates are the day the work landed.
   now. `now-playing.png` was stale in words rather than numbers — it still read
   "Not on your map yet" and "Its story starts today", the copy corrected on
   2026-11-09, and now reads "Sample map" and says the history is made up.
-  `14-dj-lightshow.png` carries no stats and was left alone.
+  `13-dj-synced.png` also moved off the single `~/Music` file, whose name reads
+  like a street address and was about to ship in the README; it now runs on the
+  generated test tracks, kept in a crate folder of their own so the crate line
+  prints `~/DJ crate` rather than the whole path to this repo. Two different
+  tracks, so the shot shows a real beat-match — B pulled from 120 to 128 BPM —
+  instead of one file on both decks. `14-dj-lightshow.png` carries no stats and
+  was left alone.
 
 - 2026-11-09 — spec: meta-instructions expanded into the standing build rules; shared shortcuts added (`Shortcuts.md`, `CLAUDE.md`). The four dated status sections were collapsed into this changelog and the stale claims in them corrected; DEFINITIONS and DEFERRED written. `tests/test_queue.py` and `tests/test_import.py` now find the project root themselves instead of failing without `argv[1]`. Now Playing says why a song is unknown while the history is sample data, instead of calling every real song new.
 - 2026-10-17 — an app icon: `favicon.svg`, `favicon.ico`, `apple-touch-icon.png`.

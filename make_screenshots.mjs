@@ -11,6 +11,18 @@
 // now-playing.png needs a song playing in the Spotify desktop app, and
 // 13-dj-synced.png needs at least one audio file in the crate folder.
 //
+// The committed 13-dj-synced.png was taken against the generated test tracks in
+// a crate of their own, which is what puts two different tracks on the decks:
+//
+//     python3 make_test_audio.py
+//     mkdir -p ~/"DJ crate" && cp data/test_audio/* ~/"DJ crate"/
+//     python3 server.py --port 8766 --music-dir ~/"DJ crate"
+//     BASE=http://127.0.0.1:8766 node make_screenshots.mjs 13-dj-synced.png
+//
+// Point it at a folder under your home directory, not at data/test_audio: the
+// crate prints the path it was given, and one inside the repo spells out your
+// whole home directory in a picture that ships in the README.
+//
 // Not captured here: 14-dj-lightshow.png, a live two-deck mix of the files
 // make_test_audio.py generates, taken by hand with the light show full-screen.
 import { spawn } from "node:child_process";
