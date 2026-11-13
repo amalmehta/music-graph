@@ -283,23 +283,16 @@ input[type="search"] { font: inherit; color: var(--text); padding: 8px 14px; bor
 .key-badge { display: inline-block; padding: 1px 7px; border-radius: 99px; font: 600 11px var(--font); color: #111; }
 .deck-overview { width: 100%; height: 54px; display: block; border-radius: 8px; background: rgba(255, 255, 255, 0.04); cursor: pointer; }
 .deck-time { display: flex; justify-content: space-between; font: 500 12px var(--font); font-variant-numeric: tabular-nums; color: var(--ink-dim); margin-top: -4px; }
-.deck-transport { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.deck-transport { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .pad { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 10px; padding: 10px 0; font: 600 12px var(--font); letter-spacing: 0.06em; }
 .pad:hover { border-color: rgba(255, 255, 255, 0.25); }
 .pad.play { font-size: 15px; }
 .pad.play.on { background: var(--deck); color: #111; border-color: transparent; box-shadow: 0 0 18px color-mix(in srgb, var(--deck) 60%, transparent); }
-.pad.toggle[aria-pressed="true"] { color: #ffb03a; border-color: rgba(255, 176, 58, 0.5); }
-.deck-row, .deck-tempo { display: flex; gap: 5px; align-items: center; }
+.deck-row { display: flex; gap: 5px; align-items: center; }
 .row-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-dim); width: 62px; flex: none; }
 .mini-pad { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 6px 0; font: 600 12px var(--font); }
 .mini-pad:hover { border-color: rgba(255, 255, 255, 0.25); }
 .mini-pad.on { background: #ffb03a; color: #111; border-color: transparent; }
-.mini-pad.wide { flex: 1.4; }
-.hot.set.hot-0 { background: #ff4f8b; color: #111; }
-.hot.set.hot-1 { background: #35d0c0; color: #111; }
-.hot.set.hot-2 { background: #8b7bff; color: #111; }
-.hot.set.hot-3 { background: #6fdc5c; color: #111; }
-.deck-tempo input { flex: 4; min-width: 60px; accent-color: var(--deck); }
 .deck-mixer { display: flex; justify-content: space-between; align-items: flex-end; gap: 6px; padding-top: 4px; border-top: 1px solid var(--line); }
 .knob { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; letter-spacing: 0.08em; color: var(--ink-dim); flex: 1; }
 input.vertical { writing-mode: vertical-lr; direction: rtl; width: 22px; height: 84px; accent-color: var(--deck); margin: 0; }
@@ -319,9 +312,6 @@ input.vertical { writing-mode: vertical-lr; direction: rtl; width: 22px; height:
 .dj-master .slider { color: var(--ink-dim); }
 .dj-master .slider input { width: 110px; accent-color: #f1f0f7; }
 .dj .ghost-btn { background: var(--panel); color: var(--ink); border-color: var(--line); }
-.rec-btn.on { background: #d92d54; border-color: transparent; color: #fff; animation: pulse-rec 1.2s ease-in-out infinite; }
-@keyframes pulse-rec { 50% { box-shadow: 0 0 0 6px rgba(217, 45, 84, 0.25); } }
-.rec-time { font-variant-numeric: tabular-nums; color: #ff6b8b; font-size: 13px; min-width: 36px; }
 #dj-full { margin-left: auto; }
 .dj-help { margin: 0; font-size: 11px; color: var(--ink-dim); }
 kbd { font: 600 10px var(--font); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); background: var(--panel); }
@@ -425,6 +415,9 @@ kbd { font: 600 10px var(--font); padding: 1px 5px; border-radius: 4px; border: 
 .setup-drop { margin-top: 14px; border: 1.5px dashed var(--border); border-radius: 14px; padding: 18px; text-align: center; transition: border-color 0.15s, background 0.15s; }
 .setup-drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
 .setup-drop .ghost-btn { margin-top: 12px; }
+.drop-veil { position: fixed; inset: 10px; z-index: 70; pointer-events: none; display: grid; place-items: center; border: 1.5px dashed var(--accent); border-radius: var(--radius); background: color-mix(in srgb, var(--accent) 5%, transparent); opacity: 0; transition: opacity 0.15s ease; }
+.drop-veil.show { opacity: 1; }
+.drop-veil p { margin: 0; padding: 10px 18px; border-radius: 99px; background: var(--surface-solid); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow); font-size: 14px; }
 .setup-progress { margin-top: 14px; }
 .setup-progress pre { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; font-size: 12px; line-height: 1.5; max-height: 190px; overflow: auto; white-space: pre-wrap; margin: 8px 0 12px; }
 .setup-progress[data-state="error"] pre { border-color: var(--accent); }
@@ -444,3 +437,26 @@ kbd { font: 600 10px var(--font); padding: 1px 5px; border-radius: 4px; border: 
 .mix-no { color: var(--ink-dim); }
 .mix-missing { color: var(--ink-dim); }
 .load-btn.preview { background: rgba(255, 255, 255, 0.08); color: var(--ink); }
+.deck-melody { width: 100%; height: 34px; display: block; margin-top: 4px; border-radius: 8px; background: rgba(255, 255, 255, 0.03); }
+
+/* ---------- first load ----------
+   436 KB of JSON lands before anything can be drawn, so hold the shape of the
+   page with quiet placeholders rather than an empty card. */
+body[data-loading] .timeline,
+body[data-loading] #view-vibes .viz-card { position: relative; overflow: hidden; }
+body[data-loading] .timeline { min-height: 86px; }
+body[data-loading] #view-vibes .viz-card { min-height: min(72vh, 760px); }
+body[data-loading] .timeline::after,
+body[data-loading] #view-vibes .viz-card::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--text) 6%, transparent) 50%, transparent 80%);
+  background-size: 220% 100%; animation: skeleton 1.4s ease-in-out infinite;
+}
+body[data-loading] #stats::after {
+  content: "Reading your listening history…"; font-size: 13px; color: var(--muted);
+}
+@keyframes skeleton { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  body[data-loading] .timeline::after,
+  body[data-loading] #view-vibes .viz-card::after { animation: none; }
+}

@@ -20,7 +20,7 @@ That opens <http://127.0.0.1:8765>. Drop the zip Spotify sent you onto the page 
 
 **No export yet?** `.venv/bin/python make_sample_data.py && .venv/bin/python build_data.py --sample` fills it with made-up listening so you can look around.
 
-Setup details, the DJ reference and how everything is computed are in the **[guide](GUIDE.md)**. The **[project brief](spotify_graph.md)** records every decision and what's been verified.
+Setup details, the DJ reference and how everything is computed are in the **[guide](GUIDE.md)**. How it is built, and why, is in **[docs/SYSTEM-DESIGN.md](docs/SYSTEM-DESIGN.md)**. The **[project brief](spotify_graph.md)** records every decision and what's been verified.
 
 ---
 
@@ -74,13 +74,13 @@ Pick a vibe and get a playlist built from your own history: songs you love that 
 
 ## Now Playing
 
-When a song plays, the page becomes a full-screen light show in the album's colors. It reacts to the actual sound through your mic (or BlackHole), and shows where the song sits in your taste map and your history with it.
+When a song plays, the page becomes a full-screen light show in the album's colors. It reacts to the actual sound through your mic (or BlackHole), draws the melody as a line running across the backdrop — time left to right, pitch up the screen — and shows where the song sits in your taste map and your history with it.
 
 ![Now Playing](screenshots/now-playing.png)
 
 ## DJ
 
-Two decks for audio files you own — Spotify's audio is protected, so it can't be mixed here. BPM and key detection, beat sync with key lock, loops, hot cues, EQ, filters, crossfader, and WAV recording of your mix.
+Two decks for audio files you own — Spotify's audio is protected, so it can't be mixed here. BPM and key detection, beat sync, a crossfader, and a full-screen light show driven by the mix.
 
 The crate also opens your Spotify playlists: each track says whether you own the audio, shows its BPM and key, and flags whether it mixes harmonically with the one above it. Tracks you don't own play through the Spotify desktop app so you can still audition them. When you're done, the set you played saves back to Spotify as a private playlist.
 

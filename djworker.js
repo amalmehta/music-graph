@@ -1,5 +1,4 @@
-// Web Worker for the DJ decks: tempo, beat grid, key and waveform analysis, plus
-// pitch-preserving time-stretch (WSOLA) so beat-matched tracks keep their key.
+// Web Worker for the DJ decks: tempo, beat grid, key and waveform analysis.
 
 self.onmessage = (e) => {
   const { type, id } = e.data;
@@ -8,9 +7,6 @@ self.onmessage = (e) => {
       const result = analyze(e.data.mono, e.data.sampleRate);
       const transfer = Object.values(result.overview).concat(Object.values(result.detail)).map((a) => a.buffer);
       self.postMessage({ id, ok: true, result }, transfer);
-    } else if (type === "stretch") {
-      const channels = stretch(e.data.channels, e.data.ratio);
-      self.postMessage({ id, ok: true, result: { channels } }, channels.map((c) => c.buffer));
     }
   } catch (err) {
     self.postMessage({ id, ok: false, error: String(err?.message || err) });
@@ -43,10 +39,76 @@ function analyze(mono, sampleRate) {
     confidence: tempo.confidence,
     key: key.name,
     camelot: key.camelot,
+    melody: melody(x, sr),
     overview: bands(x, low, lowMid, Math.ceil(x.length / OVERVIEW_BINS)),
     detail: bands(x, low, lowMid, Math.max(1, Math.round(sr / DETAIL_RATE))),
     detailRate: sr / Math.max(1, Math.round(sr / DETAIL_RATE)),
   };
+}
+
+const MELODY_BINS = 1400;      // points across the whole track, enough for a smooth ribbon
+const MELODY_LO = 65;          // C2 — below this is bass, not the tune
+const MELODY_HI = 1100;        // C6 — above this is mostly harmonics and cymbals
+
+// The shape of the tune: the strongest pitch in each frame, as a MIDI note.
+// Autocorrelation via the FFT (Wiener–Khinchin), so a whole track costs two transforms a frame.
+function melody(x, sr) {
+  const N = 2048, FFTN = 4096;
+  const hop = Math.max(256, Math.floor((x.length - N) / MELODY_BINS));
+  if (x.length < N * 2) return { midi: new Float32Array(0), rate: 1 };
+  const win = new Float64Array(N).map((_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1)));
+  const re = new Float64Array(FFTN), im = new Float64Array(FFTN);
+  const minLag = Math.max(2, Math.floor(sr / MELODY_HI));
+  const maxLag = Math.min(Math.floor(sr / MELODY_LO), N - 1);
+  const out = [];
+
+  for (let start = 0; start + N <= x.length; start += hop) {
+    re.fill(0); im.fill(0);
+    let power = 0;
+    for (let i = 0; i < N; i++) {
+      const v = x[start + i] * win[i];
+      re[i] = v;
+      power += v * v;
+    }
+    if (power < 1e-6) { out.push(NaN); continue; }              // silence has no tune
+    fft(re, im);
+    for (let k = 0; k < FFTN; k++) { re[k] = re[k] * re[k] + im[k] * im[k]; im[k] = 0; }
+    fft(re, im);                                                // of a real even spectrum, so this inverts it
+    const zero = re[0];
+    if (zero <= 0) { out.push(NaN); continue; }
+
+    // The highest peak is often an octave too low, so take the shortest lag that gets close to it.
+    let best = 0;
+    for (let lag = minLag; lag <= maxLag; lag++) if (re[lag] > best) best = re[lag];
+    const floorValue = best * 0.85;
+    let pick = -1;
+    for (let lag = minLag; lag <= maxLag; lag++) {
+      if (re[lag] >= floorValue && re[lag] > re[lag - 1] && re[lag] >= re[lag + 1]) { pick = lag; break; }
+    }
+    if (pick < 0 || best / zero < 0.3) { out.push(NaN); continue; }   // noisy or unpitched: leave a gap
+
+    // Parabolic interpolation, so the line glides instead of stepping between lags.
+    const a = re[pick - 1], b = re[pick], c = re[pick + 1];
+    const shift = (a - c) / (2 * (a - 2 * b + c)) || 0;
+    out.push(69 + 12 * Math.log2(sr / (pick + shift) / 440));
+  }
+  return { midi: medianSmooth(out), rate: sr / hop };
+}
+
+// A short median filter kills the odd octave jump without rounding off real leaps.
+function medianSmooth(values) {
+  const out = new Float32Array(values.length);
+  const window = [];
+  for (let i = 0; i < values.length; i++) {
+    window.length = 0;
+    for (let j = Math.max(0, i - 2); j <= Math.min(values.length - 1, i + 2); j++) {
+      if (!Number.isNaN(values[j])) window.push(values[j]);
+    }
+    if (window.length < 2) { out[i] = NaN; continue; }
+    window.sort((p, q) => p - q);
+    out[i] = window[window.length >> 1];
+  }
+  return out;
 }
 
 function onePole(x, sr, cutoff) {
@@ -236,55 +298,3 @@ function fft(re, im) {
   }
 }
 
-// ---------- time-stretch ----------
-
-// WSOLA: overlap-add windowed frames, each taken from near its ideal input position at the
-// offset that best continues the previous frame. ratio > 1 plays faster (shorter output).
-function stretch(channels, ratio) {
-  const N = 2048, Hs = N / 2, search = 512, step = 8, stride = 16;
-  const n = channels[0].length;
-  const outLen = Math.floor(n / ratio);
-  const mono = new Float32Array(n);
-  for (const c of channels) for (let i = 0; i < n; i++) mono[i] += c[i] / channels.length;
-  const win = new Float32Array(N).map((_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / N));
-  const outs = channels.map(() => new Float32Array(outLen + N));
-  const weight = new Float32Array(outLen + N);
-
-  const corr = (a, b, s) => {
-    let sum = 0;
-    for (let i = 0; i < N; i += s) sum += mono[a + i] * mono[b + i];
-    return sum;
-  };
-
-  let prev = -1;
-  for (let outPos = 0; outPos < outLen; outPos += Hs) {
-    const target = Math.min(n - N - 1, Math.round(outPos * ratio));
-    if (target < 0) break;
-    let best = target;
-    const natural = prev + Hs;
-    if (prev >= 0 && natural + N < n) {
-      const lo = Math.max(0, target - search), hi = Math.min(n - N - 1, target + search);
-      let bestScore = -Infinity;
-      for (let cand = lo; cand <= hi; cand += step) {
-        const s = corr(natural, cand, stride);
-        if (s > bestScore) { bestScore = s; best = cand; }
-      }
-      const center = best;
-      for (let cand = Math.max(lo, center - step + 1); cand <= Math.min(hi, center + step - 1); cand++) {
-        const s = corr(natural, cand, 4);
-        if (s > bestScore) { bestScore = s; best = cand; }
-      }
-    }
-    for (let c = 0; c < channels.length; c++) {
-      const src = channels[c], dst = outs[c];
-      for (let i = 0; i < N; i++) dst[outPos + i] += src[best + i] * win[i];
-    }
-    for (let i = 0; i < N; i++) weight[outPos + i] += win[i];
-    prev = best;
-  }
-  return outs.map((o) => {
-    const out = new Float32Array(outLen);
-    for (let i = 0; i < outLen; i++) out[i] = weight[i] > 1e-3 ? o[i] / weight[i] : 0;
-    return out;
-  });
-}

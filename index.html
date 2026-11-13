@@ -4,7 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Music Graph</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎧</text></svg>">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -18,7 +20,7 @@
     } catch {}
   </script>
 </head>
-<body>
+<body data-loading>
   <header class="top">
     <div class="brand">
       <span class="brand-mark" aria-hidden="true"></span>
@@ -190,8 +192,6 @@
             </div>
             <div class="dj-master">
               <label class="slider"><span>Master</span><input type="range" id="dj-master" min="0" max="1" step="0.01" value="0.9" aria-label="Master volume"></label>
-              <button class="ghost-btn rec-btn" id="dj-rec">● Record</button>
-              <span class="rec-time" id="dj-rec-time"></span>
               <button class="primary-btn" id="dj-full">✦ Light show</button>
             </div>
             <p class="dj-help">Keys: <kbd>A</kbd>/<kbd>L</kbd> play · <kbd>S</kbd>/<kbd>K</kbd> sync · <kbd>←</kbd><kbd>→</kbd> crossfade. Mix audio files you own. Spotify's audio is protected, so it can't be mixed here.</p>
@@ -275,6 +275,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
   <script type="module" src="app.js"></script>
+  <div class="drop-veil" id="drop-veil" aria-hidden="true"><p>Drop your Spotify export to build your graph</p></div>
   <dialog class="setup" id="setup" aria-label="Your data and setup">
     <div class="setup-card">
       <header class="setup-head">

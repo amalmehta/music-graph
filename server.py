@@ -34,9 +34,10 @@ AUDIO_TYPES = {
     ".aiff": "audio/aiff", ".flac": "audio/flac", ".ogg": "audio/ogg", ".opus": "audio/ogg",
 }
 MAX_CRATE = 10_000
+ART_CACHE_MAX = 30                   # album art kept in memory, oldest evicted first
 MAX_UPLOAD = 1_000_000_000          # a very large extended history is a few hundred MB
 SAFE_UPLOAD = re.compile(r"^[A-Za-z0-9 ._-]{1,120}\.(zip|json)$")
-STATIC_FILES = re.compile(r"^/([a-z]+\.(js|css|html)|data/(graph_data|history_index)\.json|config\.json)$")
+STATIC_FILES = re.compile(r"^/([a-z]+\.(js|css|html)|favicon\.(svg|ico)|apple-touch-icon\.png|data/(graph_data|history_index)\.json|config\.json)$")
 
 NOW_PLAYING_SCRIPT = f'''
 if application "Spotify" is not running then return "not_running"
@@ -118,11 +119,6 @@ class Player:
         with self.lock:
             self.queue = []
         return {"ok": False, "error": "Spotify didn't start that song. It may not exist (sample data songs are fictional)."}
-
-    def next(self):
-        with self.lock:
-            if self.queue:
-                self._advance()
 
     def stop(self):
         with self.lock:
@@ -326,7 +322,7 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
     def log_message(self, fmt, *args):
-        if not self.path.startswith(("/api/now-playing", "/api/queue")):
+        if not self.path.startswith("/api/now-playing"):
             super().log_message(fmt, *args)
 
     def end_headers(self):
@@ -353,8 +349,6 @@ class Handler(SimpleHTTPRequestHandler):
         url = urlparse(self.path)
         if url.path == "/api/now-playing":
             return self._json(now_playing.get())
-        if url.path == "/api/queue":
-            return self._json(player.status())
         if url.path == "/api/import":
             return self._json(importer.status())
         if url.path == "/api/crate":
@@ -394,14 +388,8 @@ class Handler(SimpleHTTPRequestHandler):
                 if not PLAYABLE_URI.match(uri):
                     return self._json({"ok": False, "error": "invalid uri"}, HTTPStatus.BAD_REQUEST)
                 return self._json(player.play_context(uri))
-            if path == "/api/queue/next":
-                player.next()
-                return self._json(player.status())
             if path == "/api/config":
                 return self._json(write_config(body))
-            if path == "/api/queue/stop":
-                player.stop()
-                return self._json(player.status())
         except Exception as e:
             return self._json({"ok": False, "error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
         self.send_error(HTTPStatus.NOT_FOUND)
@@ -467,7 +455,9 @@ class Handler(SimpleHTTPRequestHandler):
         if not ARTWORK_URL.match(url):
             return self.send_error(HTTPStatus.BAD_REQUEST)
         with self._art_lock:
-            cached = self._art_cache.get(url)
+            cached = self._art_cache.pop(url, None)
+            if cached is not None:
+                self._art_cache[url] = cached     # touched, so it goes to the back of the queue
         if not cached:
             try:
                 with urllib.request.urlopen(url, timeout=6) as r:
@@ -475,8 +465,8 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception:
                 return self.send_error(HTTPStatus.BAD_GATEWAY)
             with self._art_lock:
-                if len(self._art_cache) > 30:
-                    self._art_cache.clear()
+                while len(self._art_cache) >= ART_CACHE_MAX:
+                    self._art_cache.pop(next(iter(self._art_cache)))   # oldest first
                 self._art_cache[url] = cached
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", cached[0])

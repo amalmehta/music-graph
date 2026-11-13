@@ -19,7 +19,7 @@ export function norm(s) {
 }
 export const trackKey = (track, artist) => `${norm(track)}|${norm(artist)}`;
 
-export const VIBE_COLORS = ["#ff4f8b", "#35d0c0", "#ffb03a", "#8b7bff", "#6fdc5c", "#ff7a45", "#3fa9ff", "#e45fd6", "#f3d34a", "#9aa6ff"];
+const VIBE_COLORS = ["#ff4f8b", "#35d0c0", "#ffb03a", "#8b7bff", "#6fdc5c", "#ff7a45", "#3fa9ff", "#e45fd6", "#f3d34a", "#9aa6ff"];
 export const vibeColor = (v) => (v >= 0 ? VIBE_COLORS[v % VIBE_COLORS.length] : "#8a8fa3");
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

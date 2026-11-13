@@ -16,7 +16,7 @@ if (!fs.existsSync(dir)) {
 }
 
 const code = fs.readFileSync(path.join(root, "djworker.js"), "utf8");
-const { analyze, stretch } = new Function("self", `${code}\nreturn { analyze, stretch };`)({});
+const { analyze } = new Function("self", `${code}\nreturn { analyze };`)({});
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "djworker-"));
 
 // Decode to 48 kHz float mono, the same rate the browser's AudioContext uses here.
@@ -44,17 +44,10 @@ for (const file of fs.readdirSync(dir).sort()) {
   const beatOk = beatOffset < 0.05;
   const keyOk = result.key === expected[2];
 
-  const t1 = Date.now();
-  const stretched = stretch([mono], 128 / result.bpm);
-  const stretchMs = Date.now() - t1;
-  const again = analyze(stretched[0], 48000);
-  const stretchOk = Math.abs(again.bpm - 128) < 0.6 && again.key === result.key;
-
-  failures += [bpmOk, beatOk, stretchOk].filter((ok) => !ok).length;
+  failures += [bpmOk, beatOk].filter((ok) => !ok).length;
   console.log(
     `${file}\n  tempo ${result.bpm} BPM ${bpmOk ? "ok" : "MISMATCH"} · beat grid ${beatOffset.toFixed(3)}s off ${beatOk ? "ok" : "MISMATCH"} · ` +
-    `key ${result.key} ${keyOk ? "ok" : `(expected ${expected[2]}; neighbouring keys are acceptable)`}\n` +
-    `  stretched to 128 BPM → ${again.bpm} BPM, ${again.key} ${stretchOk ? "ok" : "MISMATCH"} · analyze ${analyzeMs} ms, stretch ${stretchMs} ms`,
+    `key ${result.key} ${keyOk ? "ok" : `(expected ${expected[2]}; neighbouring keys are acceptable)`} · analyze ${analyzeMs} ms`,
   );
 }
 
