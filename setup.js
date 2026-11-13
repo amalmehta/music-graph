@@ -31,6 +31,7 @@ export function init(graphMeta) {
     const file = e.dataTransfer.files[0];
     if (file) send(file);
   });
+  wireWindowImport();
 
   $("#import-reload").addEventListener("click", () => location.reload());
   $("#import-again").addEventListener("click", () => {
@@ -44,6 +45,53 @@ export function init(graphMeta) {
   describe();
   // An import may still be running from a page the user already closed.
   fetch("/api/import").then((r) => r.json()).then((s) => s.state === "building" && (open(), watch())).catch(() => {});
+}
+
+// ---------- drop or paste the export anywhere ----------
+
+// Names only, mirroring SAFE_UPLOAD's extensions; the server still has the final word and its
+// refusal shows up in the dialog. Anything else (audio for the DJ decks, a .txt) is left alone.
+const EXPORT_NAME = /\.(zip|json)$/i;
+const EXPORT_TYPE = /^application\/(zip|x-zip-compressed|json)$/;
+const exportFile = (files) => [...(files || [])].find((f) => EXPORT_NAME.test(f.name));
+
+function importFrom(file) {
+  if (!$("#setup").open) open();
+  send(file);
+}
+
+function wireWindowImport() {
+  const veil = $("#drop-veil");
+  let hideTimer = 0;
+  const hide = () => { clearTimeout(hideTimer); veil.classList.remove("show"); };
+
+  // Mid-drag only the MIME types are readable, not names, so the veil goes by type.
+  window.addEventListener("dragover", (e) => {
+    if (!e.dataTransfer?.types.includes("Files")) return;
+    e.preventDefault();   // every file drag, so a stray drop never opens the file in the tab
+    const looksLikeExport = [...e.dataTransfer.items].some((i) => i.kind === "file" && EXPORT_TYPE.test(i.type));
+    if (!looksLikeExport || $("#setup").open) return hide();
+    veil.classList.add("show");
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(hide, 250);   // dragover keeps firing while over the window; silence means it left
+  });
+  window.addEventListener("dragleave", (e) => { if (!e.relatedTarget) hide(); });
+  window.addEventListener("drop", (e) => {
+    if (!e.dataTransfer?.types.includes("Files")) return;
+    e.preventDefault();
+    hide();
+    if (e.target.closest?.("#import-drop")) return;   // the dialog's own drop zone already sent it
+    const file = exportFile(e.dataTransfer.files);
+    if (file) importFrom(file);
+  });
+
+  // ⌘V of a file copied in Finder
+  document.addEventListener("paste", (e) => {
+    const file = exportFile(e.clipboardData?.files);
+    if (!file) return;
+    e.preventDefault();
+    importFrom(file);
+  });
 }
 
 export function open() {

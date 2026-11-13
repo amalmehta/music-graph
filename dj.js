@@ -918,9 +918,7 @@ function wireGlobal() {
       renderCrate();
     }
   });
-  // keep stray file drops from navigating away from the page
-  window.addEventListener("dragover", (e) => { if (state.view === "dj") e.preventDefault(); });
-  window.addEventListener("drop", (e) => { if (state.view === "dj") e.preventDefault(); });
+  // setup.js keeps stray file drops anywhere on the window from navigating away
 
   // on window + capture, so the keys work wherever focus happens to be
   window.addEventListener("keydown", (e) => {
